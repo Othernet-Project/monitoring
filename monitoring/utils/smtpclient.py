@@ -1,6 +1,6 @@
-import email
 import smtplib
 import logging
+from email.mime.text import MIMEText
 
 
 class SMTPClient(object):
@@ -20,10 +20,10 @@ class SMTPClient(object):
         logging.debug('Connected to SMTP host: %s:%s', self.host, self.port)
 
     def send(self, recipients, subject, message):
-        if not self.conn:
+        if self.conn is None:
             self.connect()
-        msg = email.MIMEText(message, 'text/plain', 'utf-8')
+        msg = MIMEText(message, 'plain', 'utf-8')
         msg['Subject'] = subject
         msg['From'] = self.username
         msg['To'] = ', '.join(recipients)
-        self.conn.sendmail(self.username, self.recipients, msg)
+        self.conn.sendmail(self.username, recipients, msg.as_string())

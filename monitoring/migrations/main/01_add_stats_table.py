@@ -13,8 +13,9 @@ create table stats
     transfers boolean,                  -- whether there are ongoing transfers
     sat_config varchar,                 -- satellite config checksum
     service_ok boolean,                 -- final verdict
-    timestamp timestamp,                -- heartbeat timestamp
-    processing_time float               -- total processing time
+    timestamp integer,                  -- heartbeat timestamp
+    processing_time float,              -- total processing time
+    reported integer                    -- time reported
 );
 """
 

@@ -13,6 +13,7 @@ def pre_init(conf):
     paths = (
         conf['database.path'],
         conf['mako.module_directory'],
+        conf['reporting.alert_dir'],
     )
     for p in paths:
         ensure_dir(p)

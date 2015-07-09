@@ -1,7 +1,7 @@
 import time
 import itertools
 
-from ..utils.email import SMTPClient
+from ..utils.smtpclient import SMTPClient
 
 # Interval in which client reports are checked
 CHECK_INTERVAL = 5 * 60
@@ -32,24 +32,23 @@ class ClientError(object):
     parameter = 'unknown'
     severity = CRITICAL
 
-    def __init__(self, client_id, country, satellite, value):
+    def __init__(self, client_id, country, value):
         self.timestamp = time.time()
         self.client_id = client_id
         self.country = country
-        self.satellite = satellite
         self.value = value
 
     def __str__(self):
-        return ('[{timestamp}] Client {client_id} from {country} on '
-                '{satellite} reported {kind} with aggregate value '
-                'of {value} {parameter}'.format({
-                    'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M'),
-                    'client_id': self.client_id,
-                    'satellite': self.satellite,
-                    'kind': self.kind,
-                    'value': self.value,
-                    'parameter': self.parameter,
-                }))
+        timestamp = time.strftime('%b %d %H:%M', time.gmtime(self.timestamp))
+        return ('[{timestamp}] Client {client_id} from {country} '
+                'reported {kind} with aggregate value '
+                'of {value} {parameter}').format(
+                    timestamp=timestamp,
+                    client_id=self.client_id,
+                    kind=self.kind,
+                    value=self.value,
+                    parameter=self.parameter,
+                    country=self.country)
 
 
 class HighErrorRate(ClientError):
@@ -112,16 +111,27 @@ def client_report(results):
     total_failures = 0
     total_bitrate = 0
     last_3 = FixedLengthList()
+    country = 'n/a'
     for r in results:
         ok = signal_ok(r)
         datapoints += 1
         total_failures += not ok
         total_bitrate += r.bitrate
         last_3.append(ok)
+        if r.location:
+            country = r.location
     error_rate = total_failures / datapoints
     avg_bitrate = total_bitrate / datapoints
     last_status = all(last_3)
-    return error_rate, avg_bitrate, last_status
+    return error_rate, avg_bitrate, last_status, country
+
+
+def error_block(title, errors):
+    msg = ''
+    msg += '{}:\n\n'.format(title)
+    msg += '\n'.join([str(e) for e in errors])
+    msg += '\n\n'
+    return msg
 
 
 def construct_message(errors):
@@ -136,14 +146,9 @@ def construct_message(errors):
 
     msg = ''
     if critical:
-        msg += 'CRITICAL ALERTS:\n\n'
-        msg += '\n'.join(critical)
-        msg += '\n\n'
-
+        msg += error_block('CRITICAL ALERTS', critical)
     if warnings:
-        msg += 'WARNINGS:\n\n'
-        msg += '\n'.join(warnings)
-        msg += '\n\n'
+        msg += error_block('WARNIGNS', warnings)
     return msg
 
 
@@ -151,14 +156,15 @@ def send_reports(sat_errors, config):
     smtp_host = config['email.host']
     smtp_port = config['email.port']
     smtp_ssl = config['email.secure']
-    smtp_user = config['email.usenrname']
+    smtp_user = config['email.username']
     smtp_pass = config['email.password']
     recipients = config['reporting.recipients']
-    for sat, errors in sat_errors:
+    c = SMTPClient(smtp_host, smtp_port, smtp_ssl, smtp_user, smtp_pass)
+    for sat, errors in sat_errors.items():
         sat_name = config['sat_data'].get(sat, 'Unknown bird')
         subject = '[OUTERNET MONITOR ALERT] {}'.format(sat_name)
-        c = SMTPClient(smtp_host, smtp_port, smtp_ssl, smtp_user, smtp_pass)
-        c.send(recipients, subject, construct_message(errors))
+        message = construct_message(errors)
+        c.send(recipients, subject, message)
 
 
 def report_hook(app):
@@ -170,20 +176,20 @@ def report_hook(app):
         return
 
     task_runner = config['task.runner']
-    sat_data = config['sat_data']
     error_threshold = config['reporting.error_rate_threshold']
     bitrate_threshold = config['reporting.bitrate_threshold']
 
     db = app.config['database.databases'].main
     reports = get_sat_reports(db)
+
     if not len(reports):
-        print("Nothing to report")
+        return
+
     reports_by_sat = by_sat(reports)
 
     sat_errors = {}
 
     for sat_id, sat_reports in reports_by_sat:
-        sat_name = sat_data.get(sat_id, 'Unknown bird')
         clients = 0
         total_error_rate = 0
         total_bitrate = 0
@@ -193,18 +199,19 @@ def report_hook(app):
         reports_by_client = by_client(sat_reports)
         for client_id, client_reports in reports_by_client:
             clients += 1
-            errate, avg_bitrate, last_status = client_report(client_reports)
+            errate, avg_bitrate, last_status, country = client_report(
+                client_reports)
             total_error_rate += errate
             total_bitrate += avg_bitrate
             if not last_status and errate > error_threshold:
-                errors.append(HighErrorRate(client_id, sat_name, errate))
+                errors.append(HighErrorRate(client_id, country, errate))
             elif avg_bitrate < bitrate_threshold:
-                errors.append(LowBitrate(client_id, sat_name, avg_bitrate))
+                errors.append(LowBitrate(client_id, country, avg_bitrate))
 
         if errors:
             sat_errors[sat_id] = errors
 
     if sat_errors:
-        task_runner.schedule(send_reports, sat_errors, config)
+        send_reports(sat_errors, config)
 
     app.config['last_check'] = time.time()

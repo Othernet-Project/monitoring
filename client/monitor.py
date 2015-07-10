@@ -215,14 +215,24 @@ def send_or_buffer(server_url, buffer_path, data):
     write_buffer(buffer_path, all_data)
 
 
-def monitor_loop(server_url, key_path, socket_path, buffer_path, platform):
+def is_activator_present(activator):
+    return os.path.exists(activator)
+
+
+def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
+                 activator):
     client_key = generate_key(key_path)
     try:
         while 1:
-            data = collect_data(socket_path)
-            data['platform'] = platform
-            data['client_id'] = client_key
-            send_or_buffer(server_url, buffer_path, data)
+            # skip data collection and transmissions when the specified file
+            # is present, and work normally otherwise. if activator is not
+            # specified it should always behave normally
+            if not activator or not is_activator_present(activator):
+                data = collect_data(socket_path)
+                data['platform'] = platform
+                data['client_id'] = client_key
+                send_or_buffer(server_url, buffer_path, data)
+
             time.sleep(HEARTBEAT_PERIOD)
     except KeyboardInterrupt:
         syslog.syslog('Exiting due to keyboard interrupt')
@@ -246,9 +256,16 @@ def main():
                         'data buffer', default='/tmp/monitor.buffer')
     parser.add_argument('--platform', '-p', metavar='NAME', help='platform '
                         'name', default=None)
+    parser.add_argument('--activator', '-a', metavar='PATH', help='path to '
+                        'activation file', default=None)
     args = parser.parse_args()
     syslog.openlog(LOG_HANDLE)
-    monitor_loop(args.url, args.key, args.socket, args.buffer, args.platform)
+    monitor_loop(args.url,
+                 args.key,
+                 args.socket,
+                 args.buffer,
+                 args.platform,
+                 args.activator)
 
 
 if __name__ == '__main__':

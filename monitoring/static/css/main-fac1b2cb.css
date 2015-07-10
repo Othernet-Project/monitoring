@@ -2151,3 +2151,37 @@ footer .copyright {
 /* line 31, ../scss/partials/_feedback.scss */
 .feedback .sub {
   color: #bbbbbb; }
+
+/* line 1, ../scss/status.scss */
+.status {
+  max-width: 760px; }
+/* line 3, ../scss/status.scss */
+.status .report-section {
+  margin-bottom: 2em; }
+/* line 7, ../scss/status.scss */
+.status table th, .status table td {
+  text-align: center; }
+/* line 10, ../scss/status.scss */
+.status table th:first-child, .status table td:first-child {
+  text-align: left; }
+/* line 14, ../scss/status.scss */
+.status .health {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: top;
+  -moz-border-radius: 50%;
+  -webkit-border-radius: 50%;
+  border-radius: 50%; }
+/* line 21, ../scss/status.scss */
+.status .health.good {
+  background-color: #058120; }
+/* line 24, ../scss/status.scss */
+.status .health.bad {
+  background-color: #c41414; }
+/* line 27, ../scss/status.scss */
+.status .health.warning {
+  background-color: #e17502; }
+/* line 30, ../scss/status.scss */
+.status .health.neutral {
+  background-color: #bbbbbb; }

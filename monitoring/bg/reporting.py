@@ -149,7 +149,30 @@ def construct_message(errors):
         msg += error_block('CRITICAL ALERTS', critical)
     if warnings:
         msg += error_block('WARNIGNS', warnings)
+    if not critical and not warnings:
+        msg += 'OPERATIONAL AGAIN.\n\n'
     return msg
+
+
+def get_state(errors):
+    if any([e.severity == e.CRITICAL for e in errors]):
+        return 'CRITICAL'
+    if any([e.severity == e.WARNING for e in errors]):
+        return 'WARNING'
+    return 'OPERATIONAL'
+
+
+def get_changed_states(sat_errors, config):
+    default = dict((sat_id, 'OPERATIONAL') for sat_id in config['sat_data'])
+    old_state = config.get('last_state', default)
+    # prepare current state of sat_id:status pairs
+    state = dict((sat_id, get_state(sat_errors.get(sat_id, [])))
+                 for sat_id, sat_name in config['sat_data'].items())
+    # find difference between current and previous state
+    changes = dict(set(old_state.items()).difference(state.items()))
+    config['last_state'] = state
+    # return changed sat_id:errors pairs (empty error list if it works again)
+    return dict((key, sat_errors.get(key, [])) for key in changes)
 
 
 def send_reports(sat_errors, config):
@@ -182,9 +205,6 @@ def report_hook(app):
     db = app.config['database.databases'].main
     reports = get_sat_reports(db)
 
-    if not len(reports):
-        return
-
     reports_by_sat = by_sat(reports)
 
     sat_errors = {}
@@ -211,7 +231,8 @@ def report_hook(app):
         if errors:
             sat_errors[sat_id] = errors
 
-    if sat_errors:
-        send_reports(sat_errors, config)
+    changes = get_changed_states(sat_errors, config)
+    if changes:
+        send_reports(changes, config)
 
     app.config['last_check'] = time.time()

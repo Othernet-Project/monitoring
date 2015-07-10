@@ -6,3 +6,4 @@ bottle-utils-html==0.3.*
 bottle-utils-lazy==0.3.*
 GeoIP==1.3.2
 mako==1.0.1
+webassets==0.10.1

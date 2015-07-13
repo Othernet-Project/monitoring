@@ -20,7 +20,7 @@
                 % if current_sat:
                     % if current_sat['error']:
                     <% health = h.SPAN('', _class='health bad') %>
-                    % elif current_sat['bitrate'] < bitrate_threshold or current_sat['error_rate'] < error_rate_threshold:
+                    % elif current_sat['bitrate'] < bitrate_threshold or current_sat['error_rate'] > error_rate_threshold:
                     <% health = h.SPAN('', _class='health warning') %>
                     % else:
                     <% health = h.SPAN('', _class='health good') %>

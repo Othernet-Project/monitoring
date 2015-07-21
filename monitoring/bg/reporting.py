@@ -1,4 +1,5 @@
 import time
+import logging
 import itertools
 
 from ..utils.smtpclient import SMTPClient
@@ -187,7 +188,10 @@ def send_reports(sat_errors, config):
         sat_name = config['sat_data'].get(sat, 'Unknown bird')
         subject = '[OUTERNET MONITOR ALERT] {}'.format(sat_name)
         message = construct_message(errors)
-        c.send(recipients, subject, message)
+        try:
+            c.send(recipients, subject, message)
+        except Exception:
+            logging.exception("Mail report sending failed.")
 
 
 def report_hook(app):

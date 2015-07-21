@@ -1,0 +1,35 @@
+@import "compass/typography";
+@import "outernet/mixins/media_query";
+@import "outernet/mixins/sprites";
+@import "outernet/widgets/icons";
+@import "sprites";
+
+.menu {
+  .logo {
+    @include hide-text;
+    @include misc-icon(logo_menu, yes);
+  }
+
+  #nav a:hover {
+    color: $base;
+  }
+}
+
+.alt-menu {
+  .icon {
+    width: 30px;
+    margin-right: 0.5em;
+  }
+
+  .label {
+    display: inline-block;
+  }
+
+  .level2-lang .selected {
+    background: $forest10;
+    @include with-hdpi(icons, form_positive);
+    background-repeat: no-repeat;
+    background-position: right 20px top 50%;
+    color: $forest;
+  }
+}

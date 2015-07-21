@@ -17,4 +17,5 @@ def pre_init(config):
         'sat_ids': {s.split(':')[0]: s.split(':')[1]
                     for s in config['data.satellites']},
         'REDIRECT_DELAY': config['app.redirect_delay'],
+        '_': lambda x: x,
     })

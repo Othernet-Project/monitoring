@@ -175,7 +175,6 @@ def report_hook(app):
     if last_check + CHECK_INTERVAL > time.time():
         return
 
-    task_runner = config['task.runner']
     error_threshold = config['reporting.error_rate_threshold']
     bitrate_threshold = config['reporting.bitrate_threshold']
 
@@ -188,6 +187,7 @@ def report_hook(app):
     reports_by_sat = by_sat(reports)
 
     sat_errors = {}
+    sat_status = {}
 
     for sat_id, sat_reports in reports_by_sat:
         clients = 0
@@ -208,10 +208,14 @@ def report_hook(app):
             elif avg_bitrate < bitrate_threshold:
                 errors.append(LowBitrate(client_id, country, avg_bitrate))
 
+        sat_status[sat_id] = {'error': errors,
+                              'error_rate': total_error_rate / (clients or 1),
+                              'bitrate': total_bitrate / (clients or 1)}
         if errors:
             sat_errors[sat_id] = errors
 
     if sat_errors:
         send_reports(sat_errors, config)
 
+    app.config['last_report'] = sat_status
     app.config['last_check'] = time.time()

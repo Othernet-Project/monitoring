@@ -1,3 +1,5 @@
+#!/usr/bin/python2
+
 """
 monitor.py: Monitor ONDD internal state and report to remote host
 
@@ -14,6 +16,7 @@ import sys
 import uuid
 import time
 import json
+import signal
 import socket
 import syslog
 import hashlib
@@ -44,6 +47,22 @@ def generate_key(path):
     with open(path, 'w') as f:
         f.write(key)
     return key
+
+
+def exit(pid):
+    def exiter(*args, **kwargs):
+        if 'code' in kwargs:
+            code = kwargs['code']
+        else:
+            code = 0
+
+        try:
+            os.unlink(pid)
+        except (OSError, IOError):
+            pass
+
+        sys.exit(code)
+    return exiter
 
 
 def xml_path(path):
@@ -236,12 +255,12 @@ def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
             time.sleep(HEARTBEAT_PERIOD)
     except KeyboardInterrupt:
         syslog.syslog('Exiting due to keyboard interrupt')
-        sys.exit(0)
+        return 0
     except Exception as err:
         syslog.syslog('Abnormal exit due to error: {}'.format(err))
-        sys.exit(1)
+        return 1
     syslog.syslog('Existing normally')
-    sys.exit(0)
+    return 0
 
 
 def main():
@@ -258,15 +277,22 @@ def main():
                         'name', default=None)
     parser.add_argument('--activator', '-a', metavar='PATH', help='path to '
                         'activation file', default=None)
+    parser.add_argument('--pid', '-P', metavar='PATH', help='path to PID file',
+                        default='/var/run/monitoring.pid')
     args = parser.parse_args()
     syslog.openlog(LOG_HANDLE)
-    monitor_loop(args.url,
-                 args.key,
-                 args.socket,
-                 args.buffer,
-                 args.platform,
-                 args.activator)
 
+    with open(args.pid, 'w') as f:
+        f.write(str(os.getpid()))
+
+    exiter = exit(args.pid)
+
+    signal.signal(signal.SIGTERM, exiter)
+
+    ret = monitor_loop(args.url, args.key, args.socket, args.buffer,
+                       args.platform, args.activator)
+
+    exiter(code=ret)
 
 if __name__ == '__main__':
     main()

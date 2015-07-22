@@ -34,6 +34,7 @@ setup(
     keywords='broadcast, outernet, signal, service, monitoring',
     url='https://github.com/Outernet-Project/monitoring',
     packages=find_packages(),
+    include_package_data=True,
     long_description=read('README.rst'),
     install_requires=read('requirements.txt').strip().split('\n'),
     entry_points={

@@ -1,7 +1,7 @@
 <%inherit file='base.tpl'/>
 
 <%block name="extra_head">
-<meta http-equiv="refresh" content="300; /">
+<meta http-equiv="refresh" content="300; url=/">
 </%block>
 
 <%block name="main">

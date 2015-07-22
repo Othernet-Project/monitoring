@@ -194,6 +194,34 @@ def send_reports(sat_errors, config):
             logging.exception("Mail report sending failed.")
 
 
+def aggregate_status(sat_status):
+    aggregate = {}
+    for sat_name, data in sat_status.items():
+        nconfigs = len(data)
+        nclients = sum([d['clients'] for d in data]) or 1
+        all_errors = list(itertools.chain(*[d['errors'] for d in data]))
+
+        fcritical = sum([e.severity == e.CRITICAL for e in all_errors]) \
+            / nclients
+        fwarnings = sum([e.severity == e.WARNING for e in all_errors]) \
+            / nclients
+        if fcritical > 0.1:
+            status = 'CRITICAL'
+        elif fwarnings > 0.1:
+            status = 'WARNINGS'
+        else:
+            status = 'NORMAL'
+
+        aggregate[sat_name] = {
+            'status': status,
+            'clients': nclients,
+            'error_rate': sum([d['error_rate'] for d in data]) / nconfigs,
+            'bitrate': sum([d['bitrate'] for d in data]) / nconfigs
+        }
+
+    return aggregate
+
+
 def report_hook(app):
     config = app.config
 
@@ -204,6 +232,7 @@ def report_hook(app):
 
     error_threshold = config['reporting.error_rate_threshold']
     bitrate_threshold = config['reporting.bitrate_threshold']
+    sat_data = config['sat_data']
 
     db = app.config['database.databases'].main
     reports = get_sat_reports(db)
@@ -232,9 +261,14 @@ def report_hook(app):
             elif avg_bitrate < bitrate_threshold:
                 errors.append(LowBitrate(client_id, country, avg_bitrate))
 
-        sat_status[sat_id] = {'error': errors,
-                              'error_rate': total_error_rate / (clients or 1),
-                              'bitrate': total_bitrate / (clients or 1)}
+        sat_name = sat_data.get(sat_id, 'Unknown')
+        sat_status.setdefault(sat_name, [])
+        sat_status[sat_name].append({
+            'errors': errors,
+            'error_rate': total_error_rate / (clients or 1),
+            'bitrate': total_bitrate / (clients or 1),
+            'clients': clients})
+
         if errors:
             sat_errors[sat_id] = errors
 
@@ -242,5 +276,5 @@ def report_hook(app):
     if changes:
         send_reports(changes, config)
 
-    app.config['last_report'] = sat_status
+    app.config['last_report'] = aggregate_status(sat_status)
     app.config['last_check'] = time.time()

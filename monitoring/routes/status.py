@@ -16,6 +16,8 @@ def show_status():
     else:
         last_check = None
 
+    satellites = sorted(set([sn for sid, sn in satellites.items()]))
+
     return dict(satellites=satellites,
                 bitrate_threshold=bitrate_threshold,
                 error_rate_threshold=error_rate_threshold,

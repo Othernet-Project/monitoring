@@ -45,15 +45,5 @@
             % endfor
         </table>
     </div>
-    <div class="report-section error-log">
-        <p><strong>${_("Error log")}:</strong></p>
-        <ul>
-        % for sat_status in status.values():
-            % for err in sat_status.get('error', []):
-            <li>${err}</li>
-            % endfor
-        % endfor
-        </ul>
-    </div>
 </div>
 </%block>

@@ -246,11 +246,14 @@ def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
             # skip data collection and transmissions when the specified file
             # is present, and work normally otherwise. if activator is not
             # specified it should always behave normally
-            if not activator or not is_activator_present(activator):
-                data = collect_data(socket_path)
-                data['platform'] = platform
-                data['client_id'] = client_key
-                send_or_buffer(server_url, buffer_path, data)
+            if activator and not is_activator_present(activator):
+                time.sleep(HEARTBEAT_PERIOD)
+                continue
+
+            data = collect_data(socket_path)
+            data['platform'] = platform
+            data['client_id'] = client_key
+            send_or_buffer(server_url, buffer_path, data)
 
             time.sleep(HEARTBEAT_PERIOD)
     except KeyboardInterrupt:

@@ -1,2 +1,8 @@
 include requirements.txt
 include README.rst
+include monitoring/monitoring.ini
+recursive-include monitoring/views *.tpl
+recursive-include monitoring/static *.css
+recursive-include monitoring/static *.png
+recursive-include monitoring/static *.gif
+include monitoring/static/.webassets-manifest

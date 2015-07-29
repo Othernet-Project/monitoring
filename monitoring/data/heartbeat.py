@@ -2,6 +2,8 @@
 heartbeat.py: Processes and stores heartbeat information
 """
 
+import time
+
 from bottle import request
 
 
@@ -39,6 +41,7 @@ def process_data(country_code, ip_addr, data):
         'service_ok': status,
         'timestamp': data['timestamp'],
         'processing_time': data['processing_time'],
+        'reported': time.time(),
     }
 
     qry = db.Insert('stats', cols=payload.keys())

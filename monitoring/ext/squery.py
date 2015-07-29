@@ -232,8 +232,7 @@ def get_databases(db_confs, debug=False):
 
 
 def database_plugin(config):
-    debug = config['server.debug']
-    databases = DatabaseContainer(config['database.connections'], debug=debug)
+    databases = config['database.databases']
 
     def plugin(callback):
         @wraps(callback)
@@ -253,6 +252,9 @@ def pre_init(config):
         dbpath = os.path.join(dbdir, n + '.sqlite')
         conn = Connection(dbpath)
         config['database.connections'][n] = conn
+    debug = config['server.debug']
+    databases = DatabaseContainer(config['database.connections'], debug=debug)
+    config['database.databases'] = databases
 
 
 def post_stop(config):

@@ -1,2 +1,2 @@
-__version__ = '0.1.dev1'
+__version__ = '0.1'
 __author__ = 'Outernet Inc'

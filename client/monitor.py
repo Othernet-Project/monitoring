@@ -222,15 +222,20 @@ def send_or_buffer(server_url, buffer_path, data):
     all_data = get_buffer(buffer_path)
     all_data.append(data)
     if (time.time() - all_data[0]['timestamp']) > TRANSMIT_PERIOD:
+        # keep and send only entries that are not older than transmit period
+        all_data = [item for item in all_data
+                    if time.time() - item['timestamp'] <= TRANSMIT_PERIOD]
         syslog.syslog('Transmitting buffered data')
         try:
             urlopen(server_url, json.dumps(all_data))
-            clear_buffer(buffer_path)
-            syslog.syslog('Transmission complete, claring local buffer')
-            return
         except IOError as err:
             syslog.syslog('Could not establish connection to {}: {}'.format(
                 server_url, err))
+        else:
+            clear_buffer(buffer_path)
+            syslog.syslog('Transmission complete, claring local buffer')
+            return
+
     write_buffer(buffer_path, all_data)
 
 

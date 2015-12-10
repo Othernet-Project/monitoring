@@ -147,16 +147,16 @@ def get_count(root, xpath):
         return 0
 
 
-def get_tuner_data():
+def get_tuner_data(unknown='0000'):
     ctx = pyudev.Context()
     try:
         dvb = list(ctx.list_devices(subsystem='dvb'))[0]
         dvb_usb = dvb.parent
-        vid = int(dvb_usb.attributes['ID_VENDOR_ID'], 16)
-        mid = int(dvb_usb.attributes['ID_MODEL_ID'], 16)
+        vid = dvb_usb.get('ID_VENDOR_ID', unknown)
+        mid = dvb_usb.get('ID_MODEL_ID', unknown)
         return (vid, mid)
     except IndexError:
-        return ('0000', '0000')
+        return (unknown, unknown)
 
 
 def get_carousal_data(transfers_data):

@@ -37,6 +37,7 @@ def service_ok(signal_lock, bitrate, service_lock):
         # other than broadcast problem (e.g., broken cache directory, full
         # disk). We'll go with this for now, and change later if necessary.
         return False
+    return True
 
 
 def process_data(country_code, ip_addr, data):

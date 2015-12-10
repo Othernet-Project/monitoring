@@ -252,8 +252,8 @@ def send_report(supervisor):
             total_bitrate += avg_bitrate
             if not last_status and errate > error_threshold:
                 errors.append(HighErrorRate(client_id, country, errate))
-            elif avg_bitrate < bitrate_threshold:
-                errors.append(LowBitrate(client_id, country, avg_bitrate))
+            #elif avg_bitrate < bitrate_threshold:
+            #    errors.append(LowBitrate(client_id, country, avg_bitrate))
 
         sat_name = get_sat_name(tuner_preset)
         #sat_data.get(sat_id, 'Unknown')

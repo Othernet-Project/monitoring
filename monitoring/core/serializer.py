@@ -66,8 +66,8 @@ def _normalize_heartbeat_v1(heartbeat, base_time):
     # Scale SNR to the range of 0-31
     heartbeat['snr'] = clamp_max(int(heartbeat['snr'] * 10), 31)
 
-    # Convert bitrate to Mbps (0-6.3) and scale to range 0-63
-    bitrate = int((heartbeat['bitrate'] * 10) / (1000 * 1000))
+    # Convert bitrate to increments of 10 Kbps and clamp it to 63
+    bitrate = int(heartbeat['bitrate'] / (1000 * 10))
     heartbeat['bitrate'] = clamp_max(bitrate, 63)
 
     # Calculate timestamp relative to the previous heartbeat's timestamp
@@ -116,12 +116,24 @@ def _from_datagram_v1(datagram):
 
 
 def _denormalize_heartbeat_v1(heartbeat, base_time):
+    # Regain original timestamp (5-second resolution)
     heartbeat['timestamp'] = base_time - (heartbeat['timestamp'] * 5)
+
+    # Convert id from int to hex
     heartbeat['tuner_vendor'] = id_hex(heartbeat['tuner_vendor'])
+
+    # Convert id from int to hex
     heartbeat['tuner_model'] = id_hex(heartbeat['tuner_model'])
+
+    # Regain original strength by scaling to 10
     heartbeat['signal_strength'] = heartbeat['signal_strength'] * 10
+
+    # Downscale signal-noise ratio by 10 to original value
     heartbeat['snr'] = heartbeat['snr'] / 10
-    heartbeat['bitrate'] = int((heartbeat['bitrate'] / 10) * (1000 * 1000))
+
+    # Rescale bitrate from increments of 10 Kbps to bps
+    heartbeat['bitrate'] = int(heartbeat['bitrate'] * (1000 * 10))
+
     return heartbeat
 
 

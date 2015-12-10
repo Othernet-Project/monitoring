@@ -3,7 +3,7 @@ import logging
 
 from bottle import request, abort
 
-from core.serializer import from_stream_str
+from ..core.serializer import from_stream_str
 
 
 def process_heartbeat(country_code, ip_address, data):

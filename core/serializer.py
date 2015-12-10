@@ -16,10 +16,11 @@ def _to_stream_v1(heartbeats):
     # Reverse iterate over the heartbeats for timestamp delta calculations
     for h in reversed(heartbeats):
         h = h.copy()
+        prev_time = h['timestamp']
         h = _normalize_heartbeat_v1(h, base_time)
         datagram = _to_datagram_v1(h)
         datagrams.append(datagram)
-        base_time = h['timestamp']
+        base_time = prev_time
     # Get back the original order
     datagrams.reverse()
     stream = bitarray()

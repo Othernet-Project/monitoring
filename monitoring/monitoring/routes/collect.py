@@ -14,10 +14,8 @@ def ip_country(addr):
 
 
 def collect_heartbeat():
-    data = request.body
+    data = request.forms.get('stream')
     ip_addr = request.remote_addr
     country_code = ip_country(request.remote_addr)
-    logging.info('Received %s data points from %s', len(data), ip_addr)
     process_heartbeat(country_code, request.remote_addr, data)
-    logging.info('Finished storing all data points')
     return 'OK'

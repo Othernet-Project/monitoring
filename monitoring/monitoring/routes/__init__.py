@@ -13,7 +13,7 @@ def routes(config):
             'api:heartbeat',
             collect_heartbeat,
             'POST',
-            '/heartbeat/',
+            '/heartbeat/v1/',
             {}
         ), (
             'status:main',

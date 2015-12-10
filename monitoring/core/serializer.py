@@ -43,9 +43,9 @@ def _to_datagram_v1(heartbeat):
     datagram[195:199] = to_bitarray(heartbeat['signal_strength'], 1)[4:]
     datagram[199:204] = to_bitarray(heartbeat['snr'], 1)[3:]
     datagram[204:210] = to_bitarray(heartbeat['bitrate'], 1)[2:]
-    datagram[210:215] = to_bitarray(heartbeat['carousel_count'], 1)[3:]
-    datagram[215:246] = bitarray(heartbeat['carousel_status'])
-    datagram[246:248] = False
+    datagram[210:212] = False   # 2 bits of padding for later use
+    datagram[212:217] = to_bitarray(heartbeat['carousel_count'], 1)[3:]
+    datagram[217:248] = bitarray(heartbeat['carousel_status'])
     datagram[248:272] = MARKER
     return datagram
 
@@ -109,9 +109,10 @@ def _from_datagram_v1(datagram):
     heartbeat['signal_strength'] = from_bitarray(datagram[195:199])
     heartbeat['snr'] = from_bitarray(datagram[199:204])
     heartbeat['bitrate'] = from_bitarray(datagram[204:210])
-    count = from_bitarray(datagram[210:215])
+    # Ignore 210-211 as padding
+    count = from_bitarray(datagram[212:217])
     heartbeat['carousel_count'] = count
-    heartbeat['carousel_status'] = datagram[215:215+count].tolist()
+    heartbeat['carousel_status'] = datagram[217:217+count].tolist()
     return heartbeat
 
 

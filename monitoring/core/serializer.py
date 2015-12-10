@@ -13,15 +13,15 @@ START_MARKER = bitarray('01001111' '01001000' '01000100', ENDIAN) #OHD
 END_MARKER = bitarray('01000100' '01001000' '01001111', ENDIAN) #OHD
 
 
-def _to_stream_v1(heartbeats):
+def to_stream(heartbeats):
     base_time = time.time()
     datagrams = []
     # Reverse iterate over the heartbeats for timestamp delta calculations
     for h in reversed(heartbeats):
         h = h.copy()
         prev_time = h['timestamp']
-        h = _normalize_heartbeat_v1(h, base_time)
-        datagram = _to_datagram_v1(h)
+        h = _normalize_heartbeat(h, base_time)
+        datagram = _to_datagram(h)
         datagrams.append(datagram)
         base_time = prev_time
     # Get back the original order
@@ -32,28 +32,39 @@ def _to_stream_v1(heartbeats):
     return stream
 
 
-def _to_datagram_v1(heartbeat):
-    datagram = bitarray(34 * 8) # 272 bits
-    datagram.setall(False)
-    datagram[0:24] = START_MARKER
-    datagram[24:152] = to_bitarray(heartbeat['client_id'], 16)
-    datagram[152:156] = to_bitarray(heartbeat['timestamp'], 1)[4:]
-    datagram[156:172] = to_bitarray(heartbeat['tuner_vendor'], 2)
-    datagram[172:188] = to_bitarray(heartbeat['tuner_model'], 2)
-    datagram[188:193] = to_bitarray(heartbeat['tuner_preset'], 1)[3:]
-    datagram[193] = heartbeat['signal_lock']
-    datagram[194] = heartbeat['service_lock']
-    datagram[195:199] = to_bitarray(heartbeat['signal_strength'], 1)[4:]
-    datagram[199:204] = to_bitarray(heartbeat['snr'], 1)[3:]
-    datagram[204:210] = to_bitarray(heartbeat['bitrate'], 1)[2:]
-    datagram[210:212] = False   # 2 bits of padding for later use
-    datagram[212:217] = to_bitarray(heartbeat['carousel_count'], 1)[3:]
-    datagram[217:248] = bitarray(heartbeat['carousel_status'])
-    datagram[248:272] = END_MARKER
-    return datagram
+def from_stream(stream):
+    heartbeats = []
+    base_time = time.time()
+    start_positions = stream.search(START_MARKER)
+    end_positions = stream.search(END_MARKER)
+    if len(start_positions) != len(end_positions):
+        raise ValueError('Stream contains unmatched number of start and '
+                         'end markers')
+
+    # Reverse iterate over datagrams in stream because of timestamp deltas
+    start_positions.reverse()
+    end_positions.reverse()
+    for start, end in itertools.izip(start_positions, end_positions):
+        heartbeat = _from_datagram(stream[start:end])
+        heartbeat = _denormalize_heartbeat(heartbeat, base_time)
+        heartbeats.append(heartbeat)
+        base_time = heartbeat['timestamp']
+    # Get original order
+    heartbeats.reverse()
+    return heartbeats
 
 
-def _normalize_heartbeat_v1(heartbeat, base_time):
+def to_stream_str(heartbeats):
+    return to_stream(heartbeats).tobytes()
+
+
+def from_stream_str(stream):
+    ba = bitarray()
+    ba.frombytes(bytes(stream))
+    return from_stream(ba)
+
+
+def _normalize_heartbeat(heartbeat, base_time):
     # Get the device id as an int
     heartbeat['client_id'] = uuid.UUID(heartbeat['client_id'], version=4).int
 
@@ -80,48 +91,7 @@ def _normalize_heartbeat_v1(heartbeat, base_time):
     return heartbeat
 
 
-def _from_stream_v1(stream):
-    heartbeats = []
-    base_time = time.time()
-    start_positions = stream.search(START_MARKER)
-    end_positions = stream.search(END_MARKER)
-    if len(start_positions) != len(end_positions):
-        raise ValueError('Stream contains unmatched number of start and '
-                         'end markers')
-
-    # Reverse iterate over datagrams in stream because of timestamp deltas
-    start_positions.reverse()
-    end_positions.reverse()
-    for start, end in itertools.izip(start_positions, end_positions):
-        heartbeat = _from_datagram_v1(stream[start:end])
-        heartbeat = _denormalize_heartbeat_v1(heartbeat, base_time)
-        heartbeats.append(heartbeat)
-        base_time = heartbeat['timestamp']
-    # Get original order
-    heartbeats.reverse()
-    return heartbeats
-
-
-def _from_datagram_v1(datagram):
-    heartbeat = dict()
-    heartbeat['client_id'] = str(uuid.UUID(bytes=datagram[24:152].tobytes()))
-    heartbeat['timestamp'] = from_bitarray(datagram[152:156])
-    heartbeat['tuner_vendor'] = from_bitarray(datagram[156:172])
-    heartbeat['tuner_model'] = from_bitarray(datagram[172:188])
-    heartbeat['tuner_preset'] = from_bitarray(datagram[188:193])
-    heartbeat['signal_lock'] = datagram[193]
-    heartbeat['service_lock'] = datagram[194]
-    heartbeat['signal_strength'] = from_bitarray(datagram[195:199])
-    heartbeat['snr'] = from_bitarray(datagram[199:204])
-    heartbeat['bitrate'] = from_bitarray(datagram[204:210])
-    # Ignore 210-211 as padding
-    count = from_bitarray(datagram[212:217])
-    heartbeat['carousel_count'] = count
-    heartbeat['carousel_status'] = datagram[217:217+count].tolist()
-    return heartbeat
-
-
-def _denormalize_heartbeat_v1(heartbeat, base_time):
+def _denormalize_heartbeat(heartbeat, base_time):
     # Regain original timestamp (5-second resolution)
     heartbeat['timestamp'] = base_time - (heartbeat['timestamp'] * 5)
 
@@ -143,42 +113,44 @@ def _denormalize_heartbeat_v1(heartbeat, base_time):
     return heartbeat
 
 
-SERIALIZER_MAPPING = (
-    (1, _to_stream_v1),
-)
-
-DESERIALIZER_MAPPING = (
-    (1, _from_stream_v1),
-)
-
-
-def to_stream_str(heartbeats, version):
-    return to_stream(heartbeats, version).tobytes()
-
-
-def to_stream(heartbeats, version):
-    for v, fn in SERIALIZER_MAPPING:
-        if v == version:
-            return fn(heartbeats)
-    raise ValueError('Invalid serialization version {}'.format(version))
-
-
-def from_stream_str(stream, version):
-    ba = bitarray()
-    ba.frombytes(bytes(stream))
-    return from_stream(ba, version)
+def _from_datagram(datagram):
+    heartbeat = dict()
+    heartbeat['client_id'] = str(uuid.UUID(bytes=datagram[24:152].tobytes()))
+    heartbeat['timestamp'] = from_bitarray(datagram[152:156])
+    heartbeat['tuner_vendor'] = from_bitarray(datagram[156:172])
+    heartbeat['tuner_model'] = from_bitarray(datagram[172:188])
+    heartbeat['tuner_preset'] = from_bitarray(datagram[188:193])
+    heartbeat['signal_lock'] = datagram[193]
+    heartbeat['service_lock'] = datagram[194]
+    heartbeat['signal_strength'] = from_bitarray(datagram[195:199])
+    heartbeat['snr'] = from_bitarray(datagram[199:204])
+    heartbeat['bitrate'] = from_bitarray(datagram[204:210])
+    # Ignore 210-211 as padding
+    count = from_bitarray(datagram[212:217])
+    heartbeat['carousel_count'] = count
+    heartbeat['carousel_status'] = datagram[217:217+count].tolist()
+    return heartbeat
 
 
-def from_stream(stream, version):
-    for v, fn in DESERIALIZER_MAPPING:
-        if v == version:
-            return fn(stream)
-    raise ValueError('Invalid deserialization version {}'.format(version))
-
-
-def get_stream_version(stream):
-    version = from_bitarray(stream[24:40])
-    return version
+def _to_datagram(heartbeat):
+    datagram = bitarray(34 * 8) # 272 bits
+    datagram.setall(False)
+    datagram[0:24] = START_MARKER
+    datagram[24:152] = to_bitarray(heartbeat['client_id'], 16)
+    datagram[152:156] = to_bitarray(heartbeat['timestamp'], 1)[4:]
+    datagram[156:172] = to_bitarray(heartbeat['tuner_vendor'], 2)
+    datagram[172:188] = to_bitarray(heartbeat['tuner_model'], 2)
+    datagram[188:193] = to_bitarray(heartbeat['tuner_preset'], 1)[3:]
+    datagram[193] = heartbeat['signal_lock']
+    datagram[194] = heartbeat['service_lock']
+    datagram[195:199] = to_bitarray(heartbeat['signal_strength'], 1)[4:]
+    datagram[199:204] = to_bitarray(heartbeat['snr'], 1)[3:]
+    datagram[204:210] = to_bitarray(heartbeat['bitrate'], 1)[2:]
+    datagram[210:212] = False   # 2 bits of padding for later use
+    datagram[212:217] = to_bitarray(heartbeat['carousel_count'], 1)[3:]
+    datagram[217:248] = bitarray(heartbeat['carousel_status'])
+    datagram[248:272] = END_MARKER
+    return datagram
 
 
 def clamp_max(val, maxval):

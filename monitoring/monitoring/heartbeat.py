@@ -8,7 +8,7 @@ from ..core.serializer import from_stream_str
 
 def process_heartbeat(country_code, ip_address, data):
     try:
-        data = from_stream_str(data, version=1)
+        data = from_stream_str(data)
     except (AttributeError, ValueError):
         import traceback
         traceback.print_exc()

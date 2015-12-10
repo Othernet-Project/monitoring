@@ -297,7 +297,7 @@ def send_or_buffer(server_url, buffer_path, data):
                     if time.time() - item['timestamp'] <= TRANSMIT_PERIOD]
         syslog.syslog('Transmitting buffered data')
         try:
-            data_stream = to_stream_str(all_data, version=1)
+            data_stream = to_stream_str(all_data)
             http_params = { 'stream': data_stream }
             urlopen(server_url, urlencode(http_params))
         except IOError as err:

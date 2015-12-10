@@ -40,7 +40,6 @@ def service_ok(signal_lock, bitrate, service_lock):
 
 
 def process_data(country_code, ip_addr, data):
-    print(request.db)
     db = request.db.monitoring
 
     status = service_ok(data['signal_lock'], data['bitrate'],
@@ -51,9 +50,16 @@ def process_data(country_code, ip_addr, data):
         'location': country_code,
         'client_id': data['client_id'],
         'signal_lock': data['signal_lock'],
+        'service_lock': data['service_lock'],
+        'signal_strength': data['signal_strength'],
         'bitrate': data['bitrate'],
         'snr': data['snr'],
         'service_ok': status,
+        'tuner_vendor': data['tuner_vendor'],
+        'tuner_model': data['tuner_model'],
+        'tuner_preset': data['tuner_preset'],
+        'carousels_count': data['carousel_count'],
+        'carousels_status': data['carousel_status'],
         'timestamp': data['timestamp'],
         'reported': time.time(),
     }

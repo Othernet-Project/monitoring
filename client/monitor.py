@@ -39,7 +39,7 @@ ONDD_SOCKET_BUFF = 2048
 ONDD_SOCKET_ENCODING = 'utf8'
 HEARTBEAT_PERIOD = 60  # 1 minute
 TRANSMIT_PERIOD = 5 * 60 # 5 minutes
-NULL_BYTE = '\0'
+NULL_BYTE = b'\0'
 
 
 def generate_key(path):
@@ -130,7 +130,7 @@ def get_data(socket_path, ipc_path):
         payload = xml_path(ipc_path) + NULL_BYTE
         sock.send(payload)
         data = read(sock)
-    return ET.fromstring(data)
+    return ET.fromstring(data.encode('utf8'))
 
 
 def get_text(root, xpath, default=''):

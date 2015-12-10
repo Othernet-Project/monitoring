@@ -3,12 +3,15 @@ from __future__ import division
 
 import time
 import uuid
+import itertools
 
 from bitarray import bitarray
 
 
 ENDIAN = 'big'
-MARKER = bitarray('010011110100100001000100', ENDIAN) #OHD
+START_MARKER = bitarray('01001111' '01001000' '01000100', ENDIAN) #OHD
+END_MARKER = bitarray('01000100' '01001000' '01001111', ENDIAN) #OHD
+
 
 def _to_stream_v1(heartbeats):
     base_time = time.time()
@@ -32,7 +35,7 @@ def _to_stream_v1(heartbeats):
 def _to_datagram_v1(heartbeat):
     datagram = bitarray(34 * 8) # 272 bits
     datagram.setall(False)
-    datagram[0:24] = MARKER
+    datagram[0:24] = START_MARKER
     datagram[24:152] = to_bitarray(heartbeat['client_id'], 16)
     datagram[152:156] = to_bitarray(heartbeat['timestamp'], 1)[4:]
     datagram[156:172] = to_bitarray(heartbeat['tuner_vendor'], 2)
@@ -46,7 +49,7 @@ def _to_datagram_v1(heartbeat):
     datagram[210:212] = False   # 2 bits of padding for later use
     datagram[212:217] = to_bitarray(heartbeat['carousel_count'], 1)[3:]
     datagram[217:248] = bitarray(heartbeat['carousel_status'])
-    datagram[248:272] = MARKER
+    datagram[248:272] = END_MARKER
     return datagram
 
 
@@ -80,14 +83,16 @@ def _normalize_heartbeat_v1(heartbeat, base_time):
 def _from_stream_v1(stream):
     heartbeats = []
     base_time = time.time()
-    marker_positions = stream.search(MARKER)
+    start_positions = stream.search(START_MARKER)
+    end_positions = stream.search(END_MARKER)
+    if len(start_positions) != len(end_positions):
+        raise ValueError('Stream contains unmatched number of start and '
+                         'end markers')
+
     # Reverse iterate over datagrams in stream because of timestamp deltas
-    marker_positions.reverse()
-    i = 0
-    while i < len(marker_positions) - 1:
-        end = marker_positions[i]
-        start = marker_positions[i + 1]
-        i += 2
+    start_positions.reverse()
+    end_positions.reverse()
+    for start, end in itertools.izip(start_positions, end_positions):
         heartbeat = _from_datagram_v1(stream[start:end])
         heartbeat = _denormalize_heartbeat_v1(heartbeat, base_time)
         heartbeats.append(heartbeat)

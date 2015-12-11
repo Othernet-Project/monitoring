@@ -40,6 +40,7 @@ setup(
     entry_points={
         'console_scripts': [
             'monitoring = monitoring.app:main',
+            'monitoring-client = client.monitor:main'
         ]
     },
 )

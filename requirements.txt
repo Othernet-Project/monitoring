@@ -2,5 +2,4 @@ gevent
 librarian_core>=0.1
 bottle
 bottle-utils
-GeoIP
 bitarray

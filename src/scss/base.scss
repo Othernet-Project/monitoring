@@ -1,0 +1,75 @@
+@import "compass/reset";
+@import "compass/css3";
+@import "base/params";
+
+* {
+  @include box-sizing(border-box);
+}
+
+body {
+  font-family: $o-base-font;
+  font-size: $o-base-text-size;
+  line-height: $o-base-line-height;
+  background: $o-material;
+}
+
+a {
+  color: $o-accent;
+  text-decoration: none;
+
+  &:hover, &:focus {
+    text-decoration: underline;
+  }
+
+  &:visited {
+    text-decoration: underline;
+    color: $o-base-text-color;
+  }
+}
+
+strong, b {
+  font-weight: bold;
+}
+
+em, i {
+  font-style: italic;
+}
+
+header {
+  background: $o-pulldown-menubar-background;
+  color: $o-pulldown-menubar-text-color;
+  height: $o-pulldown-menubar-hbar-height;
+  @include box-shadow(0 0 2px transparentize($o-base, 0.6));
+
+  h1 {
+    font-size: 200%;
+    text-transform: uppercase;
+    padding: 1.4rem 1rem;
+    text-align: center;
+  }
+}
+
+table {
+  width: 100%;
+
+  th {
+    font-weight: bold;
+  }
+
+  th,td {
+    padding: 0.3rem 0;
+    border-bottom: $o-separator-border;
+    vertical-align: top;
+  }
+}
+
+.note {
+  // Basic gemetry
+  padding: 0.3rem 1rem;
+  margin-bottom: 1rem;
+
+  // Styling
+  border: 1px solid $o-friendly;
+  color: $o-friendly;
+  background: transparentize($o-friendly, 0.9);
+}

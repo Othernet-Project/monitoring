@@ -5,3 +5,8 @@
 /tmp
 .webassets-cache
 /.ropeproject
+/.*_pid
+/.sass-cache
+/monitoring/static/css
+/monitoring/static/js
+/monitoring/static/.webassets-manifest

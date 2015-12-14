@@ -6,7 +6,7 @@ from bottle import request, abort
 from ..core.serializer import from_stream_str
 
 
-def process_heartbeat(country_code, ip_address, data):
+def process_heartbeat(data):
     try:
         data = from_stream_str(data)
     except (AttributeError, ValueError):
@@ -15,10 +15,10 @@ def process_heartbeat(country_code, ip_address, data):
         # Request body is either not available at all, or the JSON is malformed
         abort(400, 'Invalid data')
 
-    logging.info('Received %s data points from %s', len(data), ip_address)
+    logging.info('Received %s data points', len(data))
 
     for d in data:
-        process_data(country_code, request.remote_addr, d)
+        process_data(d)
 
     logging.info('Finished storing all data points')
 
@@ -40,15 +40,13 @@ def service_ok(signal_lock, bitrate, service_lock):
     return True
 
 
-def process_data(country_code, ip_addr, data):
+def process_data(data):
     db = request.db.monitoring
 
     status = service_ok(data['signal_lock'], data['bitrate'],
                         data['service_lock'])
 
     payload = {
-        'ip': ip_addr,
-        'location': country_code,
         'client_id': data['client_id'],
         'signal_lock': data['signal_lock'],
         'service_lock': data['service_lock'],

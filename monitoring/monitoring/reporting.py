@@ -112,8 +112,6 @@ def client_report(results):
         total_failures += not ok
         total_bitrate += r['bitrate']
         last_3.append(ok)
-        if 'location' in r:
-            country = r['location']
     error_rate = total_failures / datapoints
     avg_bitrate = total_bitrate / datapoints
     last_status = all(last_3)

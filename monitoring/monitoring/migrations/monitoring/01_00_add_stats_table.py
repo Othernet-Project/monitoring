@@ -1,8 +1,6 @@
 SQL = """
 create table stats
 (
-    ip varchar,                         -- IP address
-    location varchar,                   -- client location
     client_id varchar,                  -- client ID
     signal_lock boolean,                -- signal lock
     service_lock boolean,               -- service lock

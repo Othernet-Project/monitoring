@@ -1,3 +1,5 @@
+from __future__ import division
+
 import time
 import logging
 import itertools
@@ -7,7 +9,7 @@ from ..core.satdata import get_sat_name, get_preset_ids
 
 
 # Interval in which client reports are checked
-CHECK_INTERVAL = 5 * 60
+CHECK_INTERVAL = 60
 
 # Minimum inteval between two consecutive notifications
 NOTIFICATION_INTERVAL = 2 * 60 * 60
@@ -268,3 +270,4 @@ def send_report(supervisor):
 
     config['last_report'] = aggregate_status(sat_status)
     config['last_check'] = time.time()
+    print(config['last_check'], config['last_report'])

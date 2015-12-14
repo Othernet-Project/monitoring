@@ -35,23 +35,21 @@ class ClientError(object):
     parameter = 'unknown'
     severity = CRITICAL
 
-    def __init__(self, client_id, country, value):
+    def __init__(self, client_id, value):
         self.timestamp = time.time()
         self.client_id = client_id
-        self.country = country
         self.value = value
 
     def __str__(self):
         timestamp = time.strftime('%b %d %H:%M', time.gmtime(self.timestamp))
-        return ('[{timestamp}] Client {client_id} from {country} '
+        return ('[{timestamp}] Client {client_id} '
                 'reported {kind} with aggregate value '
                 'of {value} {parameter}').format(
                     timestamp=timestamp,
                     client_id=self.client_id,
                     kind=self.kind,
                     value=self.value,
-                    parameter=self.parameter,
-                    country=self.country)
+                    parameter=self.parameter)
 
 
 class HighErrorRate(ClientError):
@@ -105,7 +103,6 @@ def client_report(results):
     total_failures = 0
     total_bitrate = 0
     last_3 = FixedLengthList()
-    country = 'n/a'
     for r in results:
         ok = signal_ok(r)
         datapoints += 1
@@ -115,7 +112,7 @@ def client_report(results):
     error_rate = total_failures / datapoints
     avg_bitrate = total_bitrate / datapoints
     last_status = all(last_3)
-    return error_rate, avg_bitrate, last_status, country
+    return error_rate, avg_bitrate, last_status
 
 
 def error_block(title, errors):
@@ -244,14 +241,13 @@ def send_report(supervisor):
         reports_by_client = by_client(sat_reports)
         for client_id, client_reports in reports_by_client:
             clients += 1
-            errate, avg_bitrate, last_status, country = client_report(
-                client_reports)
+            errate, avg_bitrate, last_status = client_report(client_reports)
             total_error_rate += errate
             total_bitrate += avg_bitrate
             if not last_status and errate > error_threshold:
-                errors.append(HighErrorRate(client_id, country, errate))
+                errors.append(HighErrorRate(client_id, errate))
             #elif avg_bitrate < bitrate_threshold:
-            #    errors.append(LowBitrate(client_id, country, avg_bitrate))
+            #    errors.append(LowBitrate(client_id, avg_bitrate))
 
         sat_name = get_sat_name(tuner_preset)
         #sat_data.get(sat_id, 'Unknown')

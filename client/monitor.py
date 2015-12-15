@@ -140,13 +140,6 @@ def get_text(root, xpath, default=''):
         return default
 
 
-def get_count(root, xpath):
-    try:
-        return len(root.find(xpath))
-    except AttributeError:
-        return 0
-
-
 def get_tuner_data(unknown='0000'):
     ctx = pyudev.Context()
     try:

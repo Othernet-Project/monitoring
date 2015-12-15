@@ -21,9 +21,15 @@ import socket
 import syslog
 import hashlib
 import argparse
+from urllib import urlencode
 from urllib2 import urlopen
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
+
+import pyudev
+
+from monitoring.core.serializer import to_stream_str
+from monitoring.core.satdata import PRESETS, COMPARE_KEYS
 
 LOG_HANDLE = 'outernet.monitor'
 ONDD_SOCKET_CONNECT_RETRIES = 3
@@ -33,7 +39,7 @@ ONDD_SOCKET_BUFF = 2048
 ONDD_SOCKET_ENCODING = 'utf8'
 HEARTBEAT_PERIOD = 60  # 1 minute
 TRANSMIT_PERIOD = 5 * 60  # 5 minutes
-NULL_BYTE = '\0'
+NULL_BYTE = b'\0'
 
 
 def generate_key(path):
@@ -124,7 +130,7 @@ def get_data(socket_path, ipc_path):
         payload = xml_path(ipc_path) + NULL_BYTE
         sock.send(payload)
         data = read(sock)
-    return ET.fromstring(data)
+    return ET.fromstring(data.encode('utf8'))
 
 
 def get_text(root, xpath, default=''):
@@ -134,67 +140,134 @@ def get_text(root, xpath, default=''):
         return default
 
 
-def collect_data(socket_path):
-    timestamp = time.time()
-    syslog.syslog('Collecting data')
+def get_tuner_data(unknown='0000'):
+    ctx = pyudev.Context()
+    try:
+        dvb = list(ctx.list_devices(subsystem='dvb'))[0]
+        dvb_usb = dvb.parent
+        vid = dvb_usb.get('ID_VENDOR_ID', unknown)
+        mid = dvb_usb.get('ID_MODEL_ID', unknown)
+        return (vid, mid)
+    except IndexError:
+        return (unknown, unknown)
 
-    # Obtain status information to get lock, PID, bitrate and service ID
-    status_data = get_data(socket_path, '/status')
 
-    # Signal data
-    lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
-
-    if lock:
-        snr = float(get_text(status_data, 'tuner/snr'))
+def get_carousal_data(transfers_data):
+    transfers_node = transfers_data.find('streams/stream[0]/transfers')
+    if transfers_node is not None:
+        carousel_count = len(transfers_node)
+        carousel_status = []
+        for child in transfers_node:
+            has_path = get_text(child, 'path') != ''
+            has_file = get_text(child, 'file') != ''
+            status = has_path and has_file
+            carousel_status.append(status)
     else:
-        snr = 0
+        carousel_count = 0
+        carousel_status = []
+    return (carousel_count, carousel_status)
 
-    if lock:
-        bitrate = int(get_text(status_data, 'streams/stream[0]/bitrate', 0))
-    else:
-        bitrate = 0
 
-    # Service data
-    #
-    # The PID and service ID may remain in place regardless of lock status.
-    # This is because ONDD remembers the last PID/ID it was using.
-    pid = get_text(status_data, 'streams/stream[0]/pid')
-    ident = get_text(status_data, 'streams/stream[0]/ident')
+def read_setup(setup_path):
+    if not os.path.exists(setup_path):
+        return {}
+    try:
+        with open(setup_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        syslog.syslog('Librarian setup file load failed: {}'.format(str(e)))
+        return {}
 
-    # Obtain information about transfers
-    if lock:
-        transfers_data = get_data(socket_path, '/transfers')
-        transfer = get_text(
-            transfers_data, 'streams/stream[0]/transfers/transfer[0]/path')
-        has_transfer = transfer != ''
-    else:
-        has_transfer = False
 
-    # Obtain tuner settings
-    settings_data = get_data(socket_path, '/settings')
-    sat_config = sat_ident(
-        get_text(settings_data, 'tuner/delivery', 'none'),
-        get_text(settings_data, 'tuner/frequency', ''),
-        get_text(settings_data, 'tuner/modulation', ''),
-        get_text(settings_data, 'tuner/symbolrate', ''),
-        get_text(settings_data, 'tuner/voltage', ''),
-        get_text(settings_data, 'tuner/tone', ''),
-    )
+def get_tuner_preset(setup_path):
+    setup = read_setup(setup_path)
+    ondd_setup = setup.get('ondd', {})
+    preset = fingerprint_preset(ondd_setup)
+    return preset
 
-    time_taken = time.time() - timestamp
-    syslog.syslog('Finished collecting data in {} seconds'.format(time_taken))
 
-    return {
-        'service_id': ident,
-        'pid': pid,
-        'signal_lock': lock,
-        'bitrate': bitrate,
-        'snr': snr,
-        'transfers': has_transfer,
-        'sat_config': sat_config,
-        'timestamp': timestamp,
-        'processing_time': time_taken,
-    }
+def fingerprint_preset(data):
+    if not data:
+        return 0
+    data = {k: str(v) for k, v in data.items() if k in COMPARE_KEYS}
+    for preset in PRESETS:
+        preset_data = {k: v for k, v in preset[2].items() if k in COMPARE_KEYS}
+        if preset_data == data:
+            return preset[1]
+    return 0
+
+
+def collect_data(socket_path, setup_path):
+    try:
+        timestamp = time.time()
+        syslog.syslog('Collecting data')
+
+        # Obtain status information to get lock, PID, bitrate and service ID
+        status_data = get_data(socket_path, '/status')
+
+        # Signal data
+        signal_lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
+
+        if signal_lock:
+            service_lock = get_text(
+                status_data, 'streams/stream[0]/pid', None) != None
+        else:
+            service_lock = False
+
+        if signal_lock:
+            signal_strength = int(get_text(status_data, 'tuner/signal'))
+        else:
+            signal_strength = 0
+
+        if signal_lock:
+            snr = float(get_text(status_data, 'tuner/snr'))
+        else:
+            snr = 0
+
+        if signal_lock:
+            bitrate = int(
+                get_text(status_data, 'streams/stream[0]/bitrate', 0))
+        else:
+            bitrate = 0
+
+        # Service data
+        #
+        # The PID and service ID may remain in place regardless of lock status.
+        # This is because ONDD remembers the last PID/ID it was using.
+
+        # Obtain information about transfers
+        if signal_lock:
+            transfers_data = get_data(socket_path, '/transfers')
+            carousel_count, carousel_status = get_carousal_data(transfers_data)
+        else:
+            carousel_count = 0
+            carousel_status = []
+
+        # Obtain tuner settings
+
+        vendor, model = get_tuner_data()
+        preset = get_tuner_preset(setup_path)
+
+        time_taken = time.time() - timestamp
+        syslog.syslog(
+            'Finished collecting data in {} seconds'.format(time_taken))
+
+        return {
+            'signal_lock': signal_lock,
+            'service_lock': service_lock,
+            'signal_strength': signal_strength,
+            'bitrate': bitrate,
+            'snr': snr,
+            'timestamp': timestamp,
+            'tuner_vendor': vendor,
+            'tuner_model': model,
+            'tuner_preset': preset,
+            'carousel_count': carousel_count,
+            'carousel_status': carousel_status,
+        }
+    except Exception as e:
+        syslog.syslog('Error while collecting data: {}'.format(e))
+        return None
 
 
 def get_buffer(path):
@@ -227,7 +300,9 @@ def send_or_buffer(server_url, buffer_path, data):
                     if time.time() - item['timestamp'] <= TRANSMIT_PERIOD]
         syslog.syslog('Transmitting buffered data')
         try:
-            urlopen(server_url, json.dumps(all_data))
+            data_stream = to_stream_str(all_data)
+            http_params = {'stream': data_stream}
+            urlopen(server_url, urlencode(http_params))
         except IOError as err:
             syslog.syslog('Could not establish connection to {}: {}'.format(
                 server_url, err))
@@ -244,7 +319,7 @@ def is_activator_present(activator):
 
 
 def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
-                 activator):
+                 activator, setup_path):
     client_key = generate_key(key_path)
     try:
         while 1:
@@ -255,10 +330,10 @@ def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
                 time.sleep(HEARTBEAT_PERIOD)
                 continue
 
-            data = collect_data(socket_path)
-            data['platform'] = platform
-            data['client_id'] = client_key
-            send_or_buffer(server_url, buffer_path, data)
+            data = collect_data(socket_path, setup_path)
+            if data:
+                data['client_id'] = client_key
+                send_or_buffer(server_url, buffer_path, data)
 
             time.sleep(HEARTBEAT_PERIOD)
     except KeyboardInterrupt:
@@ -283,6 +358,8 @@ def main():
                         'data buffer', default='/tmp/monitor.buffer')
     parser.add_argument('--platform', '-p', metavar='NAME', help='platform '
                         'name', default=None)
+    parser.add_argument('--setup', '-l', metavar='PATH', help='path to '
+                        'librarian setup', default=None)
     parser.add_argument('--activator', '-a', metavar='PATH', help='path to '
                         'activation file', default=None)
     parser.add_argument('--pid', '-P', metavar='PATH', help='path to PID file',
@@ -298,7 +375,7 @@ def main():
     signal.signal(signal.SIGTERM, exiter)
 
     ret = monitor_loop(args.url, args.key, args.socket, args.buffer,
-                       args.platform, args.activator)
+                       args.platform, args.activator, args.setup)
 
     exiter(code=ret)
 

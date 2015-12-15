@@ -1,0 +1,45 @@
+/**
+ * This module contains base variables that are used to re-skin (customize) the 
+ * Librarian UI toolkit.
+ *
+ * Recommended way to customize the variables is to load a separate module 
+ * containing customized values _before_ this module.
+ */
+/* line 4, ../../../../src/scss/status.scss */
+.status {
+  max-width: 600px;
+  margin: 1rem auto 3rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.75);
+  -moz-box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+  -webkit-box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+  -moz-border-radius: 0.3rem;
+  -webkit-border-radius: 0.3rem;
+  border-radius: 0.3rem;
+}
+/* line 16, ../../../../src/scss/status.scss */
+.status table td {
+  vertical-align: middle;
+  padding: 0.5rem 0.2rem;
+}
+/* line 21, ../../../../src/scss/status.scss */
+.status table .health {
+  display: inline-block;
+  vertical-align: middle;
+  width: 24px;
+  height: 24px;
+  background: rgba(51, 51, 51, 0.1);
+  border: 1px solid #ddd;
+  -moz-border-radius: 100px;
+  -webkit-border-radius: 100px;
+  border-radius: 100px;
+}
+/* line 34, ../../../../src/scss/status.scss */
+.status table .good {
+  background: #5d7b0a;
+}
+/* line 38, ../../../../src/scss/status.scss */
+.status table .warning {
+  background: #efa417;
+}

@@ -1,0 +1,43 @@
+@import "compass/css3";
+@import "base/params";
+
+.status {
+  // Basic gemetry
+  max-width: 600px;
+  margin: 1rem auto 3rem;
+  padding: 2rem;
+
+  // Styling
+  background: $o-thin-overlay-material;
+  @include box-shadow($o-thin-overlay-shadow);
+  @include border-radius($o-clickable-target-corner-radius);
+
+  table {
+    td {
+      vertical-align: middle;
+      padding: 0.5rem 0.2rem;
+    }
+
+    .health {
+      // Basic geometry
+      display: inline-block;
+      vertical-align: middle;
+      width: 24px;
+      height: 24px;
+
+      // Styling
+      background: transparentize($o-base, 0.9);
+      border: $o-separator-border;
+      @include border-radius(100px);
+    }  
+
+    .good {
+      background: $o-friendly;
+    }
+
+    .warning {
+      background: $o-warning;
+    }
+  }
+}
+

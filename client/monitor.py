@@ -38,7 +38,7 @@ ONDD_SOCKET_TIMEOUT = 20.0
 ONDD_SOCKET_BUFF = 2048
 ONDD_SOCKET_ENCODING = 'utf8'
 HEARTBEAT_PERIOD = 60  # 1 minute
-TRANSMIT_PERIOD = 5 * 60 # 5 minutes
+TRANSMIT_PERIOD = 5 * 60  # 5 minutes
 NULL_BYTE = b'\0'
 
 
@@ -209,7 +209,8 @@ def collect_data(socket_path, setup_path):
         signal_lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
 
         if signal_lock:
-            service_lock = get_text(status_data, 'streams/stream[0]/pid', None) != None
+            service_lock = get_text(
+                status_data, 'streams/stream[0]/pid', None) != None
         else:
             service_lock = False
 
@@ -224,7 +225,8 @@ def collect_data(socket_path, setup_path):
             snr = 0
 
         if signal_lock:
-            bitrate = int(get_text(status_data, 'streams/stream[0]/bitrate', 0))
+            bitrate = int(
+                get_text(status_data, 'streams/stream[0]/bitrate', 0))
         else:
             bitrate = 0
 
@@ -247,8 +249,8 @@ def collect_data(socket_path, setup_path):
         preset = get_tuner_preset(setup_path)
 
         time_taken = time.time() - timestamp
-        syslog.syslog('Finished collecting data in {} seconds'.format(time_taken))
-
+        syslog.syslog(
+            'Finished collecting data in {} seconds'.format(time_taken))
 
         return {
             'signal_lock': signal_lock,
@@ -299,10 +301,10 @@ def send_or_buffer(server_url, buffer_path, data):
         syslog.syslog('Transmitting buffered data')
         try:
             data_stream = to_stream_str(all_data)
-            http_params = { 'stream': data_stream }
+            http_params = {'stream': data_stream}
             urlopen(server_url, urlencode(http_params))
         except IOError as err:
-             syslog.syslog('Could not establish connection to {}: {}'.format(
+            syslog.syslog('Could not establish connection to {}: {}'.format(
                 server_url, err))
         else:
             clear_buffer(buffer_path)

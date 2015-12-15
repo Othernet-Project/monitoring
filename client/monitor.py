@@ -205,70 +205,74 @@ def fingerprint_preset(data):
 
 
 def collect_data(socket_path, setup_path):
-    timestamp = time.time()
-    syslog.syslog('Collecting data')
+    try:
+        timestamp = time.time()
+        syslog.syslog('Collecting data')
 
-    # Obtain status information to get lock, PID, bitrate and service ID
-    status_data = get_data(socket_path, '/status')
+        # Obtain status information to get lock, PID, bitrate and service ID
+        status_data = get_data(socket_path, '/status')
 
-    # Signal data
-    signal_lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
+        # Signal data
+        signal_lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
 
-    if signal_lock:
-        service_lock = get_text(status_data, 'streams/stream[0]/pid', None) != None
-    else:
-        service_lock = False
+        if signal_lock:
+            service_lock = get_text(status_data, 'streams/stream[0]/pid', None) != None
+        else:
+            service_lock = False
 
-    if signal_lock:
-        signal_strength = int(get_text(status_data, 'tuner/signal'))
-    else:
-        signal_strength = 0
+        if signal_lock:
+            signal_strength = int(get_text(status_data, 'tuner/signal'))
+        else:
+            signal_strength = 0
 
-    if signal_lock:
-        snr = float(get_text(status_data, 'tuner/snr'))
-    else:
-        snr = 0
+        if signal_lock:
+            snr = float(get_text(status_data, 'tuner/snr'))
+        else:
+            snr = 0
 
-    if signal_lock:
-        bitrate = int(get_text(status_data, 'streams/stream[0]/bitrate', 0))
-    else:
-        bitrate = 0
+        if signal_lock:
+            bitrate = int(get_text(status_data, 'streams/stream[0]/bitrate', 0))
+        else:
+            bitrate = 0
 
-    # Service data
-    #
-    # The PID and service ID may remain in place regardless of lock status.
-    # This is because ONDD remembers the last PID/ID it was using.
+        # Service data
+        #
+        # The PID and service ID may remain in place regardless of lock status.
+        # This is because ONDD remembers the last PID/ID it was using.
 
-    # Obtain information about transfers
-    if signal_lock:
-        transfers_data = get_data(socket_path, '/transfers')
-        carousel_count, carousel_status = get_carousal_data(transfers_data)
-    else:
-        carousel_count = 0
-        carousel_status = []
+        # Obtain information about transfers
+        if signal_lock:
+            transfers_data = get_data(socket_path, '/transfers')
+            carousel_count, carousel_status = get_carousal_data(transfers_data)
+        else:
+            carousel_count = 0
+            carousel_status = []
 
-    # Obtain tuner settings
+        # Obtain tuner settings
 
-    vendor, model = get_tuner_data()
-    preset = get_tuner_preset(setup_path)
+        vendor, model = get_tuner_data()
+        preset = get_tuner_preset(setup_path)
 
-    time_taken = time.time() - timestamp
-    syslog.syslog('Finished collecting data in {} seconds'.format(time_taken))
+        time_taken = time.time() - timestamp
+        syslog.syslog('Finished collecting data in {} seconds'.format(time_taken))
 
 
-    return {
-        'signal_lock': signal_lock,
-        'service_lock': service_lock,
-        'signal_strength': signal_strength,
-        'bitrate': bitrate,
-        'snr': snr,
-        'timestamp': timestamp,
-        'tuner_vendor': vendor,
-        'tuner_model': model,
-        'tuner_preset': preset,
-        'carousel_count': carousel_count,
-        'carousel_status': carousel_status,
-    }
+        return {
+            'signal_lock': signal_lock,
+            'service_lock': service_lock,
+            'signal_strength': signal_strength,
+            'bitrate': bitrate,
+            'snr': snr,
+            'timestamp': timestamp,
+            'tuner_vendor': vendor,
+            'tuner_model': model,
+            'tuner_preset': preset,
+            'carousel_count': carousel_count,
+            'carousel_status': carousel_status,
+        }
+    except Exception as e:
+        syslog.syslog('Error while collecting data: {}'.format(e))
+        return None
 
 
 def get_buffer(path):
@@ -332,8 +336,9 @@ def monitor_loop(server_url, key_path, socket_path, buffer_path, platform,
                 continue
 
             data = collect_data(socket_path, setup_path)
-            data['client_id'] = client_key
-            send_or_buffer(server_url, buffer_path, data)
+            if data:
+                data['client_id'] = client_key
+                send_or_buffer(server_url, buffer_path, data)
 
             time.sleep(HEARTBEAT_PERIOD)
     except KeyboardInterrupt:

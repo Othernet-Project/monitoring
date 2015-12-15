@@ -208,11 +208,6 @@ def collect_data(socket_path, setup_path):
         # Signal data
         signal_lock = get_text(status_data, 'tuner/lock', 'no') == 'yes'
 
-        if not signal_lock:
-            # If there is no signal lock, then the datapoint need not be
-            # transmitted and we stop collecting further data
-            return None
-
         if signal_lock:
             service_lock = get_text(
                 status_data, 'streams/stream[0]/pid', None) != None

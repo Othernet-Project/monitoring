@@ -161,13 +161,17 @@ def get_tuner_data(unknown='0000'):
 
 def get_carousal_data(transfers_data):
     transfers_node = transfers_data.find('streams/stream[0]/transfers')
-    carousel_count = len(transfers_node)
-    carousel_status = []
-    for child in transfers_node:
-        has_path = get_text(child, 'path') != ''
-        has_file = get_text(child, 'file') != ''
-        status = has_path and has_file
-        carousel_status.append(status)
+    if transfers_node is not None:
+        carousel_count = len(transfers_node)
+        carousel_status = []
+        for child in transfers_node:
+            has_path = get_text(child, 'path') != ''
+            has_file = get_text(child, 'file') != ''
+            status = has_path and has_file
+            carousel_status.append(status)
+    else:
+        carousel_count = 0
+        carousel_status = []
     return (carousel_count, carousel_status)
 
 

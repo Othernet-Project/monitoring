@@ -159,8 +159,8 @@ def get_carousal_data(transfers_data):
         carousel_status = []
         for child in transfers_node:
             has_path = get_text(child, 'path') != ''
-            has_file = get_text(child, 'file') != ''
-            status = has_path and has_file
+            has_hash = get_text(child, 'hash') != ''
+            status = has_path and has_hash
             carousel_status.append(status)
     else:
         carousel_count = 0

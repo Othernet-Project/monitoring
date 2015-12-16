@@ -25,7 +25,13 @@ def process_heartbeat(data):
     return 'OK'
 
 
-def service_ok(signal_lock, bitrate, service_lock):
+def service_ok(data):
+    signal_lock = data['signal_lock']
+    service_lock = data['service_lock']
+    bitrate = data['bitrate']
+    carousels_count = data['carousel_count']
+    carousels_status = data['carousel_status']
+
     if not signal_lock:
         # This is always OK because if there's no lock, we don't know if the
         # service is alright.
@@ -37,14 +43,17 @@ def service_ok(signal_lock, bitrate, service_lock):
         # other than broadcast problem (e.g., broken cache directory, full
         # disk). We'll go with this for now, and change later if necessary.
         return False
+    if carousels_count == 0 or not any(carousels_status):
+        # This means than either no carousels were detected or none of them
+        # were transmitting
+        return False
     return True
 
 
 def process_data(data):
     db = request.db.monitoring
 
-    status = service_ok(data['signal_lock'], data['bitrate'],
-                        data['service_lock'])
+    status = service_ok(data)
 
     payload = {
         'client_id': data['client_id'],

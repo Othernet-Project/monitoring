@@ -8,11 +8,14 @@ from ..utils.smtpclient import SMTPClient
 from ..core.satdata import get_sat_name, get_preset_ids
 
 
-# Interval in which client reports are checked
-CHECK_INTERVAL = 5 * 60
+# Default interval for which datapoints are used
+DATAPOINTS_INTERVAL = 20 * 60
 
 # Minimum inteval between two consecutive notifications
 NOTIFICATION_INTERVAL = 2 * 60 * 60
+
+# Interval for which faulty signal from client is considered ok
+SIGNAL_OK_INTERVAL = 20 * 60
 
 
 class FixedLengthList(list):
@@ -70,9 +73,9 @@ def signal_ok(row):
     return row['service_ok']
 
 
-def get_sat_reports(db):
+def get_sat_reports(db, interval=DATAPOINTS_INTERVAL):
     """ Select all records added since last check """
-    time_bracket = time.time() - CHECK_INTERVAL
+    time_bracket = time.time() - interval
     # Note that we are deliberately NOT taking into account any records that do
     # not have a lock. This is intentional. If there is no lock, we can't
     # really assume anything about the signal, so it does not make sense to
@@ -104,16 +107,21 @@ def client_report(results):
     datapoints = 0
     total_failures = 0
     total_bitrate = 0
-    last_3 = FixedLengthList()
+    last_good_signal_ok = 0
     for r in results:
         ok = signal_ok(r)
         datapoints += 1
         total_failures += not ok
         total_bitrate += r['bitrate']
-        last_3.append(ok)
+        timestamp = r['timestamp']
+        if signal_ok:
+            last_good_signal_ok = timestamp
+
     error_rate = total_failures / datapoints
     avg_bitrate = total_bitrate / datapoints
-    last_status = all(last_3)
+    # If the last known good signal from client is more than
+    # `SIGNAL_OK_INTERVAL` old then consider it as an error
+    last_status = (time.time() - last_good_signal_ok) < SIGNAL_OK_INTERVAL
     return error_rate, avg_bitrate, last_status
 
 
@@ -216,18 +224,13 @@ def send_report(supervisor):
     app = supervisor.app
     config = app.config
 
-    last_check = config['last_check']
-
-    if last_check + CHECK_INTERVAL > time.time():
-        return
-
     error_threshold = config['reporting.error_rate_threshold']
-    bitrate_threshold = config['reporting.bitrate_threshold']
+    datapoints_interval = config['reporting.datapoints_interval']
 
     db = supervisor.exts.databases['monitoring']
     reports = get_sat_reports(db)
 
-    reports_by_sat = by_sat(reports)
+    reports_by_sat = by_sat(reports, datapoints_interval)
 
     sat_errors = {}
     sat_status = {}

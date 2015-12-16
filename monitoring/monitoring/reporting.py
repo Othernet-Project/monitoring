@@ -228,9 +228,9 @@ def send_report(supervisor):
     datapoints_interval = config['reporting.datapoints_interval']
 
     db = supervisor.exts.databases['monitoring']
-    reports = get_sat_reports(db)
+    reports = get_sat_reports(db, datapoints_interval)
 
-    reports_by_sat = by_sat(reports, datapoints_interval)
+    reports_by_sat = by_sat(reports)
 
     sat_errors = {}
     sat_status = {}

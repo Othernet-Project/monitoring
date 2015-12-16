@@ -69,10 +69,6 @@ class LowBitrate(ClientError):
     severity = ClientError.WARNING
 
 
-def signal_ok(row):
-    return row['service_ok']
-
-
 def get_sat_reports(db, interval=DATAPOINTS_INTERVAL):
     """ Select all records added since last check """
     time_bracket = time.time() - interval
@@ -107,21 +103,21 @@ def client_report(results):
     datapoints = 0
     total_failures = 0
     total_bitrate = 0
-    last_good_signal_ok = 0
+    last_good_signal_time = 0
     for r in results:
-        ok = signal_ok(r)
+        ok = r['service_ok']
         datapoints += 1
         total_failures += not ok
         total_bitrate += r['bitrate']
         timestamp = r['timestamp']
-        if signal_ok:
-            last_good_signal_ok = timestamp
+        if ok:
+            last_good_signal_time = timestamp
 
     error_rate = total_failures / datapoints
     avg_bitrate = total_bitrate / datapoints
     # If the last known good signal from client is more than
     # `SIGNAL_OK_INTERVAL` old then consider it as an error
-    last_status = (time.time() - last_good_signal_ok) < SIGNAL_OK_INTERVAL
+    last_status = (time.time() - last_good_signal_time) < SIGNAL_OK_INTERVAL
     return error_rate, avg_bitrate, last_status
 
 

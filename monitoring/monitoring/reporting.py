@@ -113,8 +113,8 @@ def client_report(results):
         if ok:
             last_good_signal_time = timestamp
 
-    error_rate = total_failures / datapoints
-    avg_bitrate = total_bitrate / datapoints
+    error_rate = total_failures / (datapoints or 1)
+    avg_bitrate = total_bitrate / (datapoints or 1)
     # If the last known good signal from client is more than
     # `SIGNAL_OK_INTERVAL` old then consider it as an error
     last_status = (time.time() - last_good_signal_time) < SIGNAL_OK_INTERVAL

@@ -18,20 +18,6 @@ NOTIFICATION_INTERVAL = 2 * 60 * 60
 SIGNAL_OK_INTERVAL = 20 * 60
 
 
-class FixedLengthList(list):
-    """
-    Stores only a fixed number of items in the list such that appending to
-    the end of the list removes the first item when list reaches predefined
-    length.
-    """
-    max_length = 3
-
-    def append(self, item):
-        while len(self) >= self.max_length:
-            self.pop(0)
-        super(FixedLengthList, self).append(item)
-
-
 class ClientError(object):
     WARNING = 1
     CRITICAL = 2
@@ -247,11 +233,8 @@ def send_report(supervisor):
             total_bitrate += avg_bitrate
             if not last_status and errate > error_threshold:
                 errors.append(HighErrorRate(client_id, errate))
-            #elif avg_bitrate < bitrate_threshold:
-            #    errors.append(LowBitrate(client_id, avg_bitrate))
 
         sat_name = get_sat_name(tuner_preset)
-        #sat_data.get(sat_id, 'Unknown')
         sat_status.setdefault(sat_name, [])
         sat_status[sat_name].append({
             'errors': errors,
@@ -261,7 +244,6 @@ def send_report(supervisor):
 
         if errors:
             sat_errors[tuner_preset] = errors
-            #sat_errors[sat_id] = errors
 
     changes = get_changed_states(sat_errors, config)
     if changes:

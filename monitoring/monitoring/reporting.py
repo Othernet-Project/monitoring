@@ -26,21 +26,23 @@ class ClientError(object):
     parameter = 'unknown'
     severity = CRITICAL
 
-    def __init__(self, client_id, value):
+    def __init__(self, client_id, health, value):
         self.timestamp = time.time()
         self.client_id = client_id
+        self.health = health
         self.value = value
 
     def __str__(self):
         timestamp = time.strftime('%b %d %H:%M', time.gmtime(self.timestamp))
         return ('[{timestamp}] Client {client_id} '
                 'reported {kind} with aggregate value '
-                'of {value} {parameter}').format(
+                'of {value} {parameter} and health {health}').format(
                     timestamp=timestamp,
                     client_id=self.client_id,
                     kind=self.kind,
                     value=self.value,
-                    parameter=self.parameter)
+                    parameter=self.parameter,
+                    health=self.health)
 
 
 class HighErrorRate(ClientError):
@@ -75,6 +77,112 @@ def by_client(results):
     return itertools.groupby(results, lambda r: r['client_id'])
 
 
+def check_ok(datapoints):
+    """
+    Check if a client's state is ok, i.e., it has a healthy transfer profile
+
+    We consider a datapoint to show failure if it shows no carousels or if
+    none of them are receiving data. A client is said to be in a healthy
+    state `HEALTH_OK` only if more than 80% of datapoints do not have failures
+    """
+
+    failures_count = 0
+    datapoints_count = 0
+    for d in datapoints:
+        datapoints_count += 1
+        if d['carousels_count'] > 0 and any(d['carousels_status']):
+            continue
+        failures_count += 1
+    failure_rate = failures_count / (datapoints_count or 1)
+    return (failure_rate <= 0.2)
+
+
+def check_no_carousels(datapoints):
+    """
+    Detect if client shows history of having a valid bitrate, but no carousels
+    or none of them are receiving data.
+
+    A datapoint shows failure if it has a bitrate greater than 0, but shows
+    no carousels or none of them are receiving data. If more than 80% of
+    datapoints show failures, then the client is said to be at
+    `HEALTH_NO_CAROUSELS` state.
+    """
+
+    datapoints_count = 0
+    failures_count = 0
+    # Only look at the last 10 minutes worth of data to ensure that older
+    # datapoints do not incorrectly influence the failure rate calculation
+    datapoints = itertools.ifilter(lambda d: (
+        time.time() - d['timestamp']) <= 600, datapoints)
+    for d in datapoints:
+        datapoints_count += 1
+        carousels_count = d['carousels_count']
+        carousels_status = d['carousels_status']
+        bitrate = d['bitrate']
+        if bitrate > 0 and (carousels_count == 0 or not any(carousels_status)):
+            failures_count += 1
+    failure_rate = failures_count / (datapoints_count or 1)
+    return (failure_rate > 0.8)
+
+
+def check_bad_bitrate(datapoints):
+    """
+    Detect if client shows history of invalid bitrate of `0`.
+
+    A datapoint shows failure if it has a bitrate == 0. If more than 80% of
+    datapoints show failures, then the client is said to be at
+    `HEALTH_BAD_BITRATE` state.
+    """
+
+    datapoints_count = 0
+    failures_count = 0
+    for d in datapoints:
+        datapoints_count += 1
+        bitrate = d['bitrate']
+        if bitrate == 0:
+            failures_count += 1
+    failure_rate = failures_count / (datapoints_count or 1)
+    return (failure_rate > 0.8)
+
+
+def check_no_service_lock(datapoints):
+    """
+    Detect if client shows history of not being able to get a service lock.
+
+    A datapoint shows failure if it has no service lock. If more than 50% of
+    datapoints show failures, then the client is said to be at
+    `HEALTH_NO_SERVICE_LOCK` state.
+    """
+
+    failures_count = 0
+    datapoints_count = 0
+    # Only look at the last 10 minutes worth of data to ensure that older
+    # datapoints do not incorrectly influence the failure rate calculation
+    datapoints = itertools.ifilter(lambda d: (
+        time.time() - d['timestamp'] <= 600), datapoints)
+    for d in datapoints:
+        datapoints_count += 1
+        if not d['service_lock']:
+            failures_count += 1
+    failure_rate = failures_count / (datapoints_count or 1)
+    return (failure_rate >= 0.5)
+
+
+HEALTH_OK = 'ok'
+HEALTH_NO_CAROUSELS = 'no_carousels'
+HEALTH_BAD_BITRATE = 'bad_bitrate'
+HEALTH_NO_SERVICE_LOCK = 'no_lock'
+HEALTH_UNKNOWN = 'unknown'
+
+
+health_transition_map = {
+    HEALTH_OK: (check_ok, HEALTH_NO_CAROUSELS),
+    HEALTH_NO_CAROUSELS: (check_no_carousels, HEALTH_BAD_BITRATE),
+    HEALTH_BAD_BITRATE: (check_bad_bitrate, HEALTH_NO_SERVICE_LOCK),
+    HEALTH_NO_SERVICE_LOCK: (check_no_service_lock, HEALTH_UNKNOWN)
+}
+
+
 def client_report(results):
     """ Return client report
 
@@ -86,25 +194,33 @@ def client_report(results):
     This function returns the client error rate, the average bitrate over the
     entire set, and the last status.
     """
-    datapoints = 0
-    total_failures = 0
-    total_bitrate = 0
-    last_good_signal_time = 0
-    for r in results:
-        ok = r['service_ok']
-        datapoints += 1
-        total_failures += not ok
-        total_bitrate += r['bitrate']
-        timestamp = r['timestamp']
-        if ok:
-            last_good_signal_time = timestamp
+    health = HEALTH_OK
+    results = list(results)
+    logging.debug('Found {} rows for client {}'.format(len(results), results['client_id']))
+    logging.debug('Starting with {}'.format(health))
+    while health != HEALTH_UNKNOWN:
+        transition_fn, next_state = health_transition_map[health]
+        if not transition_fn(results):
+            logging.debug('Moving from {} to {}'.format(health, next_state))
+            health = next_state
+        else:
+            print('Confirmed {}'.format(health))
+            break
 
-    error_rate = total_failures / (datapoints or 1)
-    avg_bitrate = total_bitrate / (datapoints or 1)
-    # If the last known good signal from client is more than
-    # `SIGNAL_OK_INTERVAL` old then consider it as an error
-    last_status = (time.time() - last_good_signal_time) < SIGNAL_OK_INTERVAL
-    return error_rate, avg_bitrate, last_status
+    datapoints_count = len(results)
+    total_bitrate = sum([r['bitrate'] for r in results])
+    total_errors = len(filter(lambda r: not r['service_ok'], results))
+
+    avg_bitrate = total_bitrate / (datapoints_count or 1)
+    error_rate = total_errors / (datapoints_count or 1)
+    if health == HEALTH_OK:
+        status = True
+    elif health == HEALTH_UNKNOWN:
+        # This is a bit flaky and maybe a bad heuristic
+        status = (error_rate < 0.5)
+    else:
+        status = False
+    return health, error_rate, avg_bitrate, status
 
 
 def error_block(title, errors):
@@ -228,11 +344,10 @@ def send_report(supervisor):
         reports_by_client = by_client(sat_reports)
         for client_id, client_reports in reports_by_client:
             clients += 1
-            errate, avg_bitrate, last_status = client_report(client_reports)
-            total_error_rate += errate
+            health, errate, avg_bitrate, status = client_report(client_reports)
             total_bitrate += avg_bitrate
-            if not last_status and errate > error_threshold:
-                errors.append(HighErrorRate(client_id, errate))
+            if not status and errate > error_threshold:
+                errors.append(HighErrorRate(client_id, health, errate))
 
         sat_name = get_sat_name(tuner_preset)
         sat_status.setdefault(sat_name, [])

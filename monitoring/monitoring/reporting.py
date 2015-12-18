@@ -246,7 +246,7 @@ def construct_message(sat_status):
     criticals = []
     warnings = []
 
-    for e in sat_status['errors']:
+    for e in sat_status.get('errors', []):
         if e.severity == e.CRITICAL:
             criticals.append(e)
         else:
@@ -284,7 +284,7 @@ def get_changed_states(sat_errors, config):
     changes = dict(set(old_state.items()).difference(state.items()))
     config['last_state'] = state
     # return changed sat_id:errors pairs (empty error list if it works again)
-    changed_states = dict((key, sat_errors.get(key)) for key in changes)
+    changed_states = dict((key, sat_errors.get(key, {})) for key in changes)
     for preset in changes:
         changed_states[preset]['alert_status'] = state.get(preset, STATUS_NORMAL)
     return changed_states

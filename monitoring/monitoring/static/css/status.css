@@ -43,3 +43,7 @@
 .status table .warning {
   background: #efa417;
 }
+/* line 42, ../../../../src/scss/status.scss */
+.status table .bad {
+  background: #cc3737;
+}

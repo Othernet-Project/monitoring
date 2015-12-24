@@ -69,7 +69,7 @@ def get_sat_reports(db, interval=DATAPOINTS_INTERVAL):
     # not have a lock. This is intentional. If there is no lock, we can't
     # really assume anything about the signal, so it does not make sense to
     # claim unlocked signal is bad.
-    qry = db.Select('*', 'stats', where=['reported >= %(reported)s'],
+    qry = db.Select('*', 'stats', where=['reported >= %(reported)s', 'signal_lock = True'],
                     order=['tuner_preset', 'client_id', 'timestamp'])
     return db.fetchall(qry, {'reported': time_bracket})
 
@@ -93,7 +93,6 @@ def check_ok(datapoints):
 
     failures_count = 0
     datapoints_count = 0
-    datapoints = itertools.ifilter(lambda d: d['signal_lock'], datapoints)
     for d in datapoints:
         datapoints_count += 1
         if d['carousels_count'] > 0 and any(d['carousels_status']):
@@ -119,7 +118,7 @@ def check_no_carousels(datapoints):
     failures_count = 0
     # Only look at the last 10 minutes worth of data to ensure that older
     # datapoints do not incorrectly influence the failure rate calculation
-    datapoints = itertools.ifilter(lambda d: d['signal_lock'] and (
+    datapoints = itertools.ifilter(lambda d: (
         time.time() - d['timestamp']) <= 600, datapoints)
     for d in datapoints:
         datapoints_count += 1
@@ -144,7 +143,6 @@ def check_bad_bitrate(datapoints):
 
     datapoints_count = 0
     failures_count = 0
-    datapoints = itertools.ifilter(lambda d: d['signal_lock'], datapoints)
     for d in datapoints:
         datapoints_count += 1
         bitrate = d['bitrate']
@@ -168,7 +166,7 @@ def check_no_service_lock(datapoints):
     datapoints_count = 0
     # Only look at the last 10 minutes worth of data to ensure that older
     # datapoints do not incorrectly influence the failure rate calculation
-    datapoints = itertools.ifilter(lambda d: d['signal_lock'] and (
+    datapoints = itertools.ifilter(lambda d:(
         time.time() - d['timestamp'] <= 600), datapoints)
     for d in datapoints:
         datapoints_count += 1
@@ -213,8 +211,7 @@ health_transition_map = {
     HEALTH_OK: (check_ok, HEALTH_NO_CAROUSELS),
     HEALTH_NO_CAROUSELS: (check_no_carousels, HEALTH_BAD_BITRATE),
     HEALTH_BAD_BITRATE: (check_bad_bitrate, HEALTH_NO_SERVICE_LOCK),
-    HEALTH_NO_SERVICE_LOCK: (check_no_service_lock, HEALTH_NO_SIGNAL_LOCK),
-    HEALTH_NO_SIGNAL_LOCK: (check_no_signal_lock, HEALTH_UNKNOWN)
+    HEALTH_NO_SERVICE_LOCK: (check_no_service_lock, HEALTH_UNKNOWN),
 }
 
 

@@ -365,10 +365,13 @@ def send_report(supervisor):
         errors = []
 
         reports_by_client = by_client(sat_reports)
+        receiving_clients = 0
         for client_id, client_reports in reports_by_client:
             clients += 1
             health, errate, avg_bitrate, status = client_report(client_reports)
-            total_bitrate += avg_bitrate
+            if avg_bitrate > 0.0:
+                total_bitrate += avg_bitrate
+                receiving_clients += 1
             if not status:
                 errors.append(HighErrorRate(client_id, health, errate))
 
@@ -378,7 +381,7 @@ def send_report(supervisor):
         sat_status[sat_name] = {
             'preset': tuner_preset,
             'error_rate': sat_error_rate,
-            'bitrate': total_bitrate / (clients or 1),
+            'bitrate': total_bitrate / (receiving_clients or 1),
             'nclients': clients,
             'errors': errors
         }

@@ -100,7 +100,8 @@ def check_ok(datapoints):
             continue
         failures_count += 1
     failure_rate = failures_count / (datapoints_count or 1)
-    return (failure_rate <= 0.2)
+    valid = (failure_rate <= 0.2) if datapoints_count else False
+    return failure_rate, valid
 
 
 def check_no_carousels(datapoints):
@@ -128,7 +129,8 @@ def check_no_carousels(datapoints):
         if bitrate > 0 and (carousels_count == 0 or not any(carousels_status)):
             failures_count += 1
     failure_rate = failures_count / (datapoints_count or 1)
-    return (failure_rate > 0.8)
+    valid = (failure_rate > 0.8) if datapoints_count else False
+    return failure_rate, valid
 
 
 def check_bad_bitrate(datapoints):
@@ -149,7 +151,8 @@ def check_bad_bitrate(datapoints):
         if bitrate == 0:
             failures_count += 1
     failure_rate = failures_count / (datapoints_count or 1)
-    return (failure_rate > 0.8)
+    valid = (failure_rate > 0.8) if datapoints_count else False
+    return failure_rate, valid
 
 
 def check_no_service_lock(datapoints):
@@ -172,7 +175,8 @@ def check_no_service_lock(datapoints):
         if not d['service_lock']:
             failures_count += 1
     failure_rate = failures_count / (datapoints_count or 1)
-    return (failure_rate >= 0.5)
+    valid = (failure_rate >= 0.5) if datapoints_count else False
+    return failure_rate, valid
 
 
 HEALTH_OK = 'ok'
@@ -201,12 +205,13 @@ def client_report(results):
     This function returns the client error rate, the average bitrate over the
     entire set, and the last status.
     """
-    health = HEALTH_OK
+    error_rate, health = (0.0, HEALTH_OK)
     results = list(results)
 
     while health != HEALTH_UNKNOWN:
         transition_fn, next_state = health_transition_map[health]
-        if not transition_fn(results):
+        error_rate, valid_state = transition_fn(results)
+        if not valid_state:
             health = next_state
         else:
             break

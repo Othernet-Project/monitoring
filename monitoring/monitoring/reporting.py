@@ -179,10 +179,33 @@ def check_no_service_lock(datapoints):
     return failure_rate, valid
 
 
+def check_no_signal_lock(datapoints):
+    """
+    Detect if client shows history of not being able to get a signal lock.
+
+    A datapoint shows failure if it has no signal lock. If more than 20% of
+    datapoints show failures, then the client is said to be at
+    `HEALTH_NO_SIGNAL_LOCK` state.
+    """
+
+    failures_count = 0
+    datapoints_count = 0
+    # Only look at the last 10 minutes worth of data to ensure that older
+    # datapoints do not incorrectly influence the failure rate calculation
+    datapoints = filter(lambda d:(time.time() - d['timestamp'] <= 600), datapoints)
+    failures = filter(lambda d: not d['signal_lock'], datapoints)
+    datapoints_count = len(datapoints)
+    failures_count = len(failures)
+    failure_rate = failures_count / (datapoints_count or 1)
+    valid = (failure_rate >= 0.2) if datapoints_count else False
+    return failure_rate, valid
+
+
 HEALTH_OK = 'ok'
 HEALTH_NO_CAROUSELS = 'no_carousels'
 HEALTH_BAD_BITRATE = 'bad_bitrate'
 HEALTH_NO_SERVICE_LOCK = 'no_service_lock'
+HEALTH_NO_SIGNAL_LOCK = 'no_signal_lock'
 HEALTH_UNKNOWN = 'unknown'
 
 
@@ -190,7 +213,8 @@ health_transition_map = {
     HEALTH_OK: (check_ok, HEALTH_NO_CAROUSELS),
     HEALTH_NO_CAROUSELS: (check_no_carousels, HEALTH_BAD_BITRATE),
     HEALTH_BAD_BITRATE: (check_bad_bitrate, HEALTH_NO_SERVICE_LOCK),
-    HEALTH_NO_SERVICE_LOCK: (check_no_service_lock, HEALTH_UNKNOWN)
+    HEALTH_NO_SERVICE_LOCK: (check_no_service_lock, HEALTH_NO_SIGNAL_LOCK),
+    HEALTH_NO_SIGNAL_LOCK: (check_no_signal_lock, HEALTH_UNKNOWN)
 }
 
 
@@ -219,21 +243,13 @@ def client_report(results):
     datapoints_count = len(results)
     total_bitrate = sum([r['bitrate'] for r in results])
     total_errors = len(filter(lambda r: not r['service_ok'], results))
-    total_no_signal_locks = len(filter(lambda r: not['signal_lock'], results))
 
     avg_bitrate = total_bitrate / (datapoints_count or 1)
-    error_rate = total_errors / (datapoints_count or 1)
-    no_signal_lock_rate = total_no_signal_locks / (datapoints_count or 1)
     if health == HEALTH_OK:
         status = True
     elif health == HEALTH_UNKNOWN:
-        # If less than 20% of datapoints show no service locks,
-        # then the client probably is ok
-        if no_signal_lock_rate < 0.2:
-            status = True
-        else:
-            # This is a bit flaky and maybe a bad heuristic
-            status = (error_rate < 0.5)
+        error_rate = total_errors / (datapoints_count or 1)
+        status = (error_rate < 0.5)
     else:
         status = False
     return health, error_rate, avg_bitrate, status

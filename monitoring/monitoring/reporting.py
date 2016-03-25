@@ -95,7 +95,9 @@ def check_ok(datapoints):
     datapoints_count = 0
     for d in datapoints:
         datapoints_count += 1
-        if d['carousels_count'] > 0 and any(d['carousels_status']):
+        ok = d['bitrate'] > 0
+        ok = ok and d['carousels_count'] > 0 and any(d['carousels_status'])
+        if ok:
             continue
         failures_count += 1
     failure_rate = failures_count / (datapoints_count or 1)

@@ -11,7 +11,7 @@ from monitoring import __version__
 SCRIPTDIR = os.path.dirname(__file__) or '.'
 PY3 = sys.version_info >= (3, 0, 0)
 
-VERSION = '0.3'
+VERSION = '0.4.dev1'
 
 
 def read(fname):

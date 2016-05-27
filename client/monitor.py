@@ -305,7 +305,7 @@ def send_or_buffer(server_url, buffer_path, data):
                 server_url, err))
         else:
             clear_buffer(buffer_path)
-            syslog.syslog('Transmission complete, claring local buffer')
+            syslog.syslog('Transmission complete, clearing local buffer')
             return
 
     write_buffer(buffer_path, all_data)

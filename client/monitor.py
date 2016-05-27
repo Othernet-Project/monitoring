@@ -97,10 +97,7 @@ def test_connection(path):
             sock.connect(path)
             connected = True
         except socket.error:
-            syslog.syslog('Could not connect to socket. '
-                          'Pausing for next attempt')
             time.sleep(ONDD_SOCKET_CONNECT_TIMEOUT)
-    syslog.syslog('Connected to socket')
     return sock
 
 

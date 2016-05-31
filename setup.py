@@ -5,13 +5,11 @@ import sys
 
 from setuptools import find_packages, setup
 
-from monitoring import __version__
-
 
 SCRIPTDIR = os.path.dirname(__file__) or '.'
 PY3 = sys.version_info >= (3, 0, 0)
 
-VERSION = '0.4.dev1'
+VERSION = '1.0'
 
 
 def read(fname):
@@ -28,7 +26,7 @@ def read(fname):
 
 setup(
     name='monitoring',
-    version=__version__,
+    version=VERSION,
     author='Outernet Inc',
     author_email='apps@outernet.is',
     description='Server and client for monitoring ONDD internal state',

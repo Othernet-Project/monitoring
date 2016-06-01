@@ -9,7 +9,7 @@ from setuptools import find_packages, setup
 SCRIPTDIR = os.path.dirname(__file__) or '.'
 PY3 = sys.version_info >= (3, 0, 0)
 
-VERSION = '1.0'
+VERSION = '1.1'
 
 
 def read(fname):

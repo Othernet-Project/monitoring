@@ -97,10 +97,7 @@ def test_connection(path):
             sock.connect(path)
             connected = True
         except socket.error:
-            syslog.syslog('Could not connect to socket. '
-                          'Pausing for next attempt')
             time.sleep(ONDD_SOCKET_CONNECT_TIMEOUT)
-    syslog.syslog('Connected to socket')
     return sock
 
 
@@ -308,7 +305,7 @@ def send_or_buffer(server_url, buffer_path, data):
                 server_url, err))
         else:
             clear_buffer(buffer_path)
-            syslog.syslog('Transmission complete, claring local buffer')
+            syslog.syslog('Transmission complete, clearing local buffer')
             return
 
     write_buffer(buffer_path, all_data)
